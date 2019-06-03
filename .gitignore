@@ -1,0 +1,8 @@
+.idea/
+*.pyc
+data/
+01_original/
+02_noisy/
+03_output/
+04_filters/
+sdae.pth
