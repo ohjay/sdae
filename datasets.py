@@ -3,6 +3,7 @@ import scipy.io as sio
 from torch.utils import data
 from skimage.util import view_as_windows
 
+
 class OlshausenDataset(data.Dataset):
     """(Whitened) natural scene images.
     Available here: http://www.rctn.org/bruno/sparsenet.

@@ -78,7 +78,8 @@ def save_image_wrapper(im, filepath):
 
 def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='olshausen_ae',
                dataset='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
-               restore_path=None, save_path='./sdae.pth', log_freq=10, olshausen_path=None, olshausen_step_size=1):
+               restore_path=None, save_path='./sdae.pth', log_freq=10, olshausen_path=None,
+               olshausen_step_size=1, weight_decay=0):
     # set up log folders
     if not os.path.exists('./01_original'):
         os.makedirs('./01_original')
@@ -100,7 +101,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
         model.load_state_dict(torch.load(restore_path))
         print('restored model from %s' % restore_path)
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     # load data
     data_minval, data_maxval = 0.0, 1.0
@@ -122,8 +123,9 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
 
     # training loop
     warning_displayed = False
-    loss, im, noisy_im, output = None, None, None, None
+    im, noisy_im, output = None, None, None
     for epoch in range(num_epochs):
+        mean_loss = 0
         for batch_idx, data in enumerate(data_loader):
             im, _ = data
             im = im.float()
@@ -146,6 +148,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
             # =============== forward ===============
             output = model(noisy_im)
             loss = criterion(output, im)
+            mean_loss += (loss - mean_loss) / (batch_idx + 1)
 
             # =============== backward ==============
             optimizer.zero_grad()
@@ -153,7 +156,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
             optimizer.step()
 
         # =================== log ===================
-        print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, loss.item()))
+        print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, mean_loss.item()))
         if epoch % log_freq == 0:
             to_save = [
                 (to_img(im.data.cpu()), './01_original', 'original'),
@@ -186,6 +189,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_freq', type=int, default=10)
     parser.add_argument('--olshausen_path', type=str, default=None)
     parser.add_argument('--olshausen_step_size', type=int, default=1)
+    parser.add_argument('--weight_decay', type=float, default=0)
 
     args = parser.parse_args()
     print(args)
@@ -194,4 +198,4 @@ if __name__ == '__main__':
     train_sdae(
         args.batch_size, args.learning_rate, args.num_epochs, args.model_key, args.dataset, args.noise_type,
         args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path, args.save_path, args.log_freq,
-        args.olshausen_path, args.olshausen_step_size)
+        args.olshausen_path, args.olshausen_step_size, args.weight_decay)
