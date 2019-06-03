@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class OlshausenDAE(nn.Module):
+class OlshausenAE(nn.Module):
 
     def __init__(self):
-        super(OlshausenDAE, self).__init__()
+        super(OlshausenAE, self).__init__()
 
         self.encoder_dense1 = nn.Linear(in_features=12*12, out_features=120)
         self.decoder_dense1 = nn.Linear(in_features=120, out_features=12*12)
@@ -30,10 +30,10 @@ class OlshausenDAE(nn.Module):
         return self.encoder_dense1.weight.data.cpu().numpy()
 
 
-class MNISTDAE(nn.Module):
+class MNISTAE(nn.Module):
 
     def __init__(self):
-        super(MNISTDAE, self).__init__()
+        super(MNISTAE, self).__init__()
 
         self.encoder_dense1 = nn.Linear(in_features=28*28, out_features=120)
         self.decoder_dense1 = nn.Linear(in_features=120, out_features=28*28)

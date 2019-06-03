@@ -77,8 +77,9 @@ def save_image_wrapper(im, filepath):
     print('[o] saved image to %s' % filepath)
 
 
-def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='olshausen_dae', dataset='olshausen', noise_type='gs',
-               zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1, restore_path=None, save_path='./sdae.pth', log_freq=10):
+def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='olshausen_ae',
+               dataset='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
+               restore_path=None, save_path='./sdae.pth', log_freq=10):
     # set up log folders
     if not os.path.exists('./01_original'):
         os.makedirs('./01_original')
@@ -91,8 +92,8 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
 
     # set up model and optimizer
     Model = {
-        'mnist_dae': MNISTDAE,
-        'olshausen_dae': OlshausenDAE,
+        'mnist_ae': MNISTAE,
+        'olshausen_ae': OlshausenAE,
     }[model_key.lower()]
     print('using %r as the model' % (Model,))
     model = Model().cuda()
@@ -172,7 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=1e-2)
     parser.add_argument('--num_epochs', type=int, default=100)
-    parser.add_argument('--model_key', type=str, default='olshausen_dae')
+    parser.add_argument('--model_key', type=str, default='olshausen_ae')
     parser.add_argument('--dataset', type=str, default='olshausen')
     parser.add_argument('--noise_type', type=str, default='gs')
     parser.add_argument('--zero_frac', type=float, default=0.3)

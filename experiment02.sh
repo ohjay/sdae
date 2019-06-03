@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# experiment01
+# experiment02
 # ------------
 # Reproduces results from section 5.1 in Vincent et al.
-# Trains a single-layer denoising autoencoder on natural image patches.
-# The learned weights end up resembling Gabor filters (/edge detectors).
+# Trains a single-layer regular autoencoder on natural image patches.
+# The learned weights won't end up having much meaningful structure.
 
 python3 sdae.py \
     --batch_size 128 \
@@ -12,5 +12,4 @@ python3 sdae.py \
     --num_epochs 100 \
     --model_key olshausen_ae \
     --dataset olshausen \
-    --noise_type gs \
-    --gaussian_stdev 0.4
+    --noise_type n/a
