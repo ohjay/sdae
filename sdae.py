@@ -64,8 +64,7 @@ def plot_first_layer_weights(model, weight_h=None, weight_w=None):
             weight = weights[i, :]
             if not weight_h or not weight_w:
                 # Infer height and width of weight, assuming it is square
-                weight_h = int(np.sqrt(weight.size))
-                weight_w = int(weight / weight_h)
+                weight_h = weight_w = int(np.sqrt(weight.size))
             col.imshow(np.reshape(weights[i, :], (weight_h, weight_w)), cmap='gray')
             col.axis('off')
             i += 1
