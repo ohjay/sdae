@@ -32,26 +32,29 @@ def normalize(x):
 
 
 def zero_mask(x, zero_frac):
-    """Apply zero-masking noise to a PyTorch tensor."""
+    """Apply zero-masking noise to a PyTorch tensor.
+    Returns noisy X and a bitmask describing the affected locations."""
     bitmask = torch.rand_like(x) > zero_frac  # approx. ZERO_FRAC zeros
-    return x * bitmask.float()  # assumes the minimum value is 0
+    return x * bitmask.float(), bitmask  # assumes the minimum value is 0
 
 
 def add_gaussian(x, gaussian_stdev):
-    """Apply isotropic additive Gaussian noise to a PyTorch tensor."""
+    """Apply isotropic additive Gaussian noise to a PyTorch tensor.
+    Returns noisy X and a bitmask describing the affected locations."""
     noise = torch.empty_like(x).normal_(0, gaussian_stdev)
-    return x + noise
+    return x + noise, torch.ones_like(x, dtype=torch.uint8)
 
 
 def salt_and_pepper(x, sp_frac, minval=0.0, maxval=1.0):
-    """Apply salt-and-pepper noise to a PyTorch tensor."""
+    """Apply salt-and-pepper noise to a PyTorch tensor.
+    Returns noisy X and a bitmask describing the affected locations."""
     rand = torch.rand_like(x)
     min_idxs = rand < (sp_frac / 2.0)
     max_idxs = rand > (1.0 - sp_frac / 2.0)
     x_sp = x.clone()
     x_sp[min_idxs] = minval
     x_sp[max_idxs] = maxval
-    return x_sp
+    return x_sp, torch.clamp(min_idxs + max_idxs, 0, 1)
 
 
 def plot_first_layer_weights(model, weight_h=None, weight_w=None):
@@ -79,7 +82,7 @@ def save_image_wrapper(im, filepath):
 def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='olshausen_ae',
                dataset='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
                restore_path=None, save_path='./sdae.pth', log_freq=10, olshausen_path=None,
-               olshausen_step_size=1, weight_decay=0):
+               olshausen_step_size=1, weight_decay=0, loss_type='mse', emph_wt_a=1, emph_wt_b=1):
     # set up log folders
     if not os.path.exists('./01_original'):
         os.makedirs('./01_original')
@@ -100,7 +103,12 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     if restore_path:
         model.load_state_dict(torch.load(restore_path))
         print('restored model from %s' % restore_path)
-    criterion = nn.MSELoss()
+    Loss = {
+        'mse': nn.MSELoss,
+        'binary_cross_entropy': nn.BCELoss,
+    }[loss_type.lower()]
+    print('using %r as the loss' % (Loss,))
+    criterion = Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     # load data
@@ -122,6 +130,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 
     # training loop
+    affected = None
     warning_displayed = False
     im, noisy_im, output = None, None, None
     for epoch in range(num_epochs):
@@ -131,11 +140,11 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
             im = im.float()
             im = im.view(im.size(0), -1)
             if noise_type == 'mn':
-                noisy_im = zero_mask(im, zero_frac)
+                noisy_im, affected = zero_mask(im, zero_frac)
             elif noise_type == 'gs':
-                noisy_im = add_gaussian(im, gaussian_stdev)
+                noisy_im, affected = add_gaussian(im, gaussian_stdev)
             elif noise_type == 'sp':
-                noisy_im = salt_and_pepper(im, sp_frac, data_minval, data_maxval)
+                noisy_im, affected = salt_and_pepper(im, sp_frac, data_minval, data_maxval)
             else:
                 if not warning_displayed:
                     print('unrecognized noise type: %r' % (noise_type,))
@@ -147,7 +156,12 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
 
             # =============== forward ===============
             output = model(noisy_im)
-            loss = criterion(output, im)
+            if (emph_wt_a != 1 or emph_wt_b != 1) and noise_type != 'gs':
+                # emphasize corrupted dimensions in the loss
+                loss = emph_wt_a * criterion(output[affected], im[affected]) + \
+                       emph_wt_b * criterion(output[1 - affected], im[1 - affected])
+            else:
+                loss = criterion(output, im)
             mean_loss += (loss - mean_loss) / (batch_idx + 1)
 
             # =============== backward ==============
@@ -190,6 +204,9 @@ if __name__ == '__main__':
     parser.add_argument('--olshausen_path', type=str, default=None)
     parser.add_argument('--olshausen_step_size', type=int, default=1)
     parser.add_argument('--weight_decay', type=float, default=0)
+    parser.add_argument('--loss_type', type=str, default='mse')
+    parser.add_argument('--emph_wt_a', type=float, default=1)
+    parser.add_argument('--emph_wt_b', type=float, default=1)
 
     args = parser.parse_args()
     print(args)
@@ -198,4 +215,4 @@ if __name__ == '__main__':
     train_sdae(
         args.batch_size, args.learning_rate, args.num_epochs, args.model_key, args.dataset, args.noise_type,
         args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path, args.save_path, args.log_freq,
-        args.olshausen_path, args.olshausen_step_size, args.weight_decay)
+        args.olshausen_path, args.olshausen_step_size, args.weight_decay, args.loss_type, args.emph_wt_a, args.emph_wt_b)
