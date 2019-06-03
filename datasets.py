@@ -32,3 +32,9 @@ class OlshausenDataset(data.Dataset):
 
     def __getitem__(self, index):
         return self.patches[index, :, :], index  # (image, "label")
+
+    def get_minval(self):
+        return self.patches.min()
+
+    def get_maxval(self):
+        return self.patches.max()

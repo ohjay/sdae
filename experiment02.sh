@@ -12,4 +12,6 @@ python3 sdae.py \
     --num_epochs 100 \
     --model_key olshausen_ae \
     --dataset olshausen \
+    --olshausen_path /home/owen/workspace/sdae/data/natural/images.mat \
+    --olshausen_step_size 1 \
     --noise_type n/a

@@ -79,7 +79,7 @@ def save_image_wrapper(im, filepath):
 
 def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='olshausen_ae',
                dataset='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
-               restore_path=None, save_path='./sdae.pth', log_freq=10):
+               restore_path=None, save_path='./sdae.pth', log_freq=10, olshausen_path=None, olshausen_step_size=1):
     # set up log folders
     if not os.path.exists('./01_original'):
         os.makedirs('./01_original')
@@ -104,6 +104,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0)
 
     # load data
+    data_minval, data_maxval = 0.0, 1.0
     if dataset.lower() == 'mnist':
         img_transform = transforms.Compose([
             transforms.ToTensor(),
@@ -112,7 +113,9 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
         dataset = MNIST(root='./data', train=True, transform=img_transform, download=True)
     elif dataset.lower() == 'olshausen':
         dataset = OlshausenDataset(
-            '/home/owen/workspace/sdae/data/natural/images.mat', patch_size=12, step_size=1, normalize=False)
+            olshausen_path, patch_size=12, step_size=olshausen_step_size, normalize=False)
+        data_minval = dataset.get_minval()
+        data_maxval = dataset.get_maxval()
     else:
         print('unrecognized dataset: %r' % (dataset,))
         print('error incoming...')
@@ -131,7 +134,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
             elif noise_type == 'gs':
                 noisy_im = add_gaussian(im, gaussian_stdev)
             elif noise_type == 'sp':
-                noisy_im = salt_and_pepper(im, sp_frac)
+                noisy_im = salt_and_pepper(im, sp_frac, data_minval, data_maxval)
             else:
                 if not warning_displayed:
                     print('unrecognized noise type: %r' % (noise_type,))
@@ -182,6 +185,8 @@ if __name__ == '__main__':
     parser.add_argument('--restore_path', type=str, default=None)
     parser.add_argument('--save_path', type=str, default='./sdae.pth')
     parser.add_argument('--log_freq', type=int, default=10)
+    parser.add_argument('--olshausen_path', type=str, default=None)
+    parser.add_argument('--olshausen_step_size', type=int, default=1)
 
     args = parser.parse_args()
     print(args)
@@ -189,4 +194,5 @@ if __name__ == '__main__':
 
     train_sdae(
         args.batch_size, args.learning_rate, args.num_epochs, args.model_key, args.dataset, args.noise_type,
-        args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path, args.save_path, args.log_freq)
+        args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path, args.save_path, args.log_freq,
+        args.olshausen_path, args.olshausen_step_size)
