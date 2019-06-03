@@ -13,7 +13,6 @@ import torch.nn as nn
 from functools import reduce
 import matplotlib.pyplot as plt
 from torchvision import transforms
-from torch.autograd import Variable
 from datasets import OlshausenDataset
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
@@ -74,8 +73,8 @@ def plot_first_layer_weights(model, weight_h=None, weight_w=None):
     plt.show()
 
 
-def save_image_wrapper(im, filepath):
-    save_image(im, filepath)
+def save_image_wrapper(img, filepath):
+    save_image(img, filepath)
     print('[o] saved image to %s' % filepath)
 
 
@@ -96,6 +95,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     # set up model and optimizer
     Model = {
         'mnist_ae': MNISTAE,
+        'mnist_sae2': MNISTSAE2,
         'olshausen_ae': OlshausenAE,
     }[model_key.lower()]
     print('using %r as the model' % (Model,))
@@ -132,57 +132,68 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     # training loop
     affected = None
     warning_displayed = False
-    im, noisy_im, output = None, None, None
-    for epoch in range(num_epochs):
-        mean_loss = 0
-        for batch_idx, data in enumerate(data_loader):
-            im, _ = data
-            im = im.float()
-            im = im.view(im.size(0), -1)
-            if noise_type == 'mn':
-                noisy_im, affected = zero_mask(im, zero_frac)
-            elif noise_type == 'gs':
-                noisy_im, affected = add_gaussian(im, gaussian_stdev)
-            elif noise_type == 'sp':
-                noisy_im, affected = salt_and_pepper(im, sp_frac, data_minval, data_maxval)
-            else:
-                if not warning_displayed:
-                    print('unrecognized noise type: %r' % (noise_type,))
-                    print('using clean image as input')
-                    warning_displayed = True
-                noisy_im = im
-            im = Variable(im).cuda()
-            noisy_im = Variable(noisy_im).cuda()
+    original, noisy, output = None, None, None
+    for ae_idx in range(model.num_blocks):
+        # train one block at a time
+        print('--------------------')
+        print('training block %d/%d' % (ae_idx + 1, model.num_blocks))
+        print('--------------------')
+        for epoch in range(num_epochs):
+            mean_loss = 0
+            for batch_idx, data in enumerate(data_loader):
+                original, _ = data
+                original = original.float()
+                original = original.view(original.size(0), -1)
+                original = original.cuda()
+                original = model.encode(original)
+                original = original.detach()
 
-            # =============== forward ===============
-            output = model(noisy_im)
-            if (emph_wt_a != 1 or emph_wt_b != 1) and noise_type != 'gs':
-                # emphasize corrupted dimensions in the loss
-                loss = emph_wt_a * criterion(output[affected], im[affected]) + \
-                       emph_wt_b * criterion(output[1 - affected], im[1 - affected])
-            else:
-                loss = criterion(output, im)
-            mean_loss += (loss - mean_loss) / (batch_idx + 1)
+                # apply noise
+                if noise_type == 'mn':
+                    noisy, affected = zero_mask(original, zero_frac)
+                elif noise_type == 'gs':
+                    noisy, affected = add_gaussian(original, gaussian_stdev)
+                elif noise_type == 'sp':
+                    noisy, affected = salt_and_pepper(original, sp_frac, data_minval, data_maxval)
+                else:
+                    if not warning_displayed:
+                        print('unrecognized noise type: %r' % (noise_type,))
+                        print('using clean image as input')
+                        warning_displayed = True
+                    noisy = original
+                noisy = noisy.detach().cuda()
 
-            # =============== backward ==============
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                # =============== forward ===============
+                output = model(noisy, ae_idx)
+                if (emph_wt_a != 1 or emph_wt_b != 1) and noise_type != 'gs':
+                    # emphasize corrupted dimensions in the loss
+                    loss = emph_wt_a * criterion(output[affected], original[affected]) + \
+                           emph_wt_b * criterion(output[1 - affected], original[1 - affected])
+                else:
+                    loss = criterion(output, original)
+                mean_loss += (loss - mean_loss) / (batch_idx + 1)
 
-        # =================== log ===================
-        print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, mean_loss.item()))
-        if epoch % log_freq == 0:
-            to_save = [
-                (to_img(im.data.cpu()), './01_original', 'original'),
-                (to_img(noisy_im.data.cpu()), './02_noisy', 'noisy'),
-                (to_img(output.data.cpu()), './03_output', 'output'),
-                (to_img(model.get_first_layer_weights(as_tensor=True)), './04_filters', 'filters'),
-            ]
-            for im, folder, desc in to_save:
-                save_image_wrapper(im, os.path.join(folder, '{}_{}.png'.format(desc, epoch + 1)))
+                # =============== backward ==============
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-            torch.save(model.state_dict(), save_path)
-            print('[o] saved model to %s' % save_path)
+            # =================== log ===================
+            print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, mean_loss.item()))
+            if epoch % log_freq == 0:
+                if ae_idx == 0:
+                    to_save = [
+                        (to_img(original.data.cpu()), './01_original', 'original'),
+                        (to_img(noisy.data.cpu()), './02_noisy', 'noisy'),
+                        (to_img(output.data.cpu()), './03_output', 'output'),
+                        (to_img(model.get_first_layer_weights(as_tensor=True)), './04_filters', 'filters'),
+                    ]
+                    for img, folder, desc in to_save:
+                        save_image_wrapper(img, os.path.join(folder, '{}_{}.png'.format(desc, epoch + 1)))
+
+                torch.save(model.state_dict(), save_path)
+                print('[o] saved model to %s' % save_path)
+        model.num_trained_blocks += 1
 
     plot_first_layer_weights(model)
 

@@ -3,56 +3,118 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class OlshausenAE(nn.Module):
+class SAE(nn.Module):
+    """Stacked autoencoder."""
+
+    def __init__(self):
+        super(SAE, self).__init__()
+
+        self.encoders = nn.ModuleList([])
+        self.decoders = nn.ModuleList([])
+
+        self.num_trained_blocks = 0
+        self.num_blocks = len(self.encoders)
+
+    def forward(self, x, ae_idx=None):
+        x = self.encode(x, ae_idx)
+        x = self.decode(x, ae_idx)
+        return x
+
+    def get_first_layer_weights(self, as_tensor=False):
+        if as_tensor:
+            return self.encoders[0][0].weight.data.cpu()
+        return self.encoders[0][0].weight.data.cpu().numpy()
+
+    def encode(self, x, ae_idx=None):
+        """Encode the input. If AE_IDX is provided,
+        encode with that particular encoder only."""
+        if ae_idx is None:
+            for i in range(self.num_trained_blocks):
+                x = self.encoders[i](x)
+        else:
+            x = self.encoders[ae_idx](x)
+        return x
+
+    def decode(self, x, ae_idx=None):
+        """Decode the input. If AE_IDX is provided,
+        decode with that particular decoder only."""
+        if ae_idx is None:
+            start = self.num_blocks - self.num_trained_blocks
+            for i in range(start, self.num_blocks):
+                x = self.decoders[i](x)
+        else:
+            x = self.decoders[self.num_blocks-ae_idx-1](x)
+        return x
+
+
+class OlshausenAE(SAE):
+    """Olshausen autoencoder."""
 
     def __init__(self):
         super(OlshausenAE, self).__init__()
 
-        self.encoder_dense1 = nn.Linear(in_features=12*12, out_features=120)
-        self.decoder_dense1 = nn.Linear(in_features=120, out_features=12*12)
-
-        self.encoder = nn.Sequential(
-            self.encoder_dense1,
-            nn.Sigmoid(),
-        )
-        self.decoder = nn.Sequential(
-            self.decoder_dense1,
-        )
-
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
-
-    def get_first_layer_weights(self, as_tensor=False):
-        if as_tensor:
-            return self.encoder_dense1.weight.data.cpu()
-        return self.encoder_dense1.weight.data.cpu().numpy()
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=12*12, out_features=120),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=120, out_features=12*12),
+            ),
+        ])
+        self.num_trained_blocks = 0
+        self.num_blocks = len(self.encoders)
 
 
-class MNISTAE(nn.Module):
+class MNISTAE(SAE):
+    """MNIST autoencoder."""
 
     def __init__(self):
         super(MNISTAE, self).__init__()
 
-        self.encoder_dense1 = nn.Linear(in_features=28*28, out_features=120)
-        self.decoder_dense1 = nn.Linear(in_features=120, out_features=28*28)
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=28*28, out_features=120),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=120, out_features=28*28),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.num_trained_blocks = 0
+        self.num_blocks = len(self.encoders)
 
-        self.encoder = nn.Sequential(
-            self.encoder_dense1,
-            nn.Sigmoid(),
-        )
-        self.decoder = nn.Sequential(
-            self.decoder_dense1,
-            nn.Sigmoid(),
-        )
 
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+class MNISTSAE2(SAE):
+    """MNIST stacked autoencoder (two blocks)."""
 
-    def get_first_layer_weights(self, as_tensor=False):
-        if as_tensor:
-            return self.encoder_dense1.weight.data.cpu()
-        return self.encoder_dense1.weight.data.cpu().numpy()
+    def __init__(self):
+        super(MNISTSAE2, self).__init__()
+
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=28*28, out_features=120),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=120, out_features=60),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=60, out_features=120),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=120, out_features=28*28),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.num_trained_blocks = 0
+        self.num_blocks = len(self.encoders)
