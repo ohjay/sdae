@@ -10,7 +10,7 @@
 python3 mnist_classification.py \
     --batch_size 128 \
     --learning_rate 0.005 \
-    --num_epochs 10 \
+    --num_epochs 50 \
     --sae_restore_path n/a \
     --classifier_model_key mnist_dense_classifier2 \
     --classifier_save_path ./stage2_classifier.pth \

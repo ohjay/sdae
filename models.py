@@ -103,21 +103,21 @@ class MNISTSAE2(SAE):
 
         self.encoders = nn.ModuleList([
             nn.Sequential(
-                nn.Linear(in_features=28*28, out_features=120),
+                nn.Linear(in_features=28*28, out_features=1000),
                 nn.Sigmoid(),
             ),
             nn.Sequential(
-                nn.Linear(in_features=120, out_features=60),
+                nn.Linear(in_features=1000, out_features=1000),
                 nn.Sigmoid(),
             ),
         ])
         self.decoders = nn.ModuleList([
             nn.Sequential(
-                nn.Linear(in_features=60, out_features=120),
+                nn.Linear(in_features=1000, out_features=1000),
                 nn.Sigmoid(),
             ),
             nn.Sequential(
-                nn.Linear(in_features=120, out_features=28*28),
+                nn.Linear(in_features=1000, out_features=28*28),
                 nn.Sigmoid(),
             ),
         ])
@@ -132,9 +132,9 @@ class MNISTDenseClassifier2(nn.Module):
         super(MNISTDenseClassifier2, self).__init__()
 
         self.classifier = nn.Sequential(
-            nn.Linear(enc_out_features, 500),
+            nn.Linear(enc_out_features, 1000),
             nn.ReLU(),
-            nn.Linear(500, 10),
+            nn.Linear(1000, 10),
             nn.LogSoftmax(dim=1),
         )
 

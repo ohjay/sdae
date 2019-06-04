@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# experiment08
+# experiment11
 # ------------
-# 1. Pretrains a stacked denoising autoencoder in a layer-by-layer fashion.
+# 1. Pretrains a stacked REGULAR autoencoder in a layer-by-layer fashion.
 # 2. Trains the stacked encoder + classifier on the MNIST classification task.
 
 python3 sdae.py \
@@ -11,8 +11,7 @@ python3 sdae.py \
     --num_epochs 50 \
     --model_key mnist_sae2 \
     --dataset mnist \
-    --noise_type gs \
-    --gaussian_stdev 0.4 \
+    --noise_type n/a \
     --weight_decay 0.0000001 \
     --save_path ./stage1_sae.pth
 
