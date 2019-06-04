@@ -55,9 +55,14 @@ def salt_and_pepper(x, sp_frac, minval=0.0, maxval=1.0):
     return x_sp, torch.clamp(min_idxs + max_idxs, 0, 1)
 
 
-def plot_first_layer_weights(model, weight_h=None, weight_w=None):
+def plot_first_layer_weights(model, weight_h=None, weight_w=None, block_on_viz=False):
     weights = model.get_first_layer_weights()
     print('shape of first-layer weights: %r' % (weights.shape,))
+
+    if not block_on_viz:
+        plt.ion()
+        plt.show()
+
     fig, ax = plt.subplots(nrows=5, ncols=10)
     i = 0
     for row in ax:
@@ -69,7 +74,12 @@ def plot_first_layer_weights(model, weight_h=None, weight_w=None):
             col.imshow(np.reshape(weights[i, :], (weight_h, weight_w)), cmap='gray')
             col.axis('off')
             i += 1
-    plt.show()
+
+    if not block_on_viz:
+        plt.pause(10)
+        plt.close()
+    else:
+        plt.show()
 
 
 def save_image_wrapper(img, filepath):
