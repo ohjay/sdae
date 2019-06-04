@@ -2,15 +2,28 @@
 
 # experiment08
 # ------------
-# 1. Pretrains a stacked denoising autoencoder layer by layer.
-# 2. Trains the stacked denoising autoencoder on the MNIST classification task. (todo)
+# 1. Pretrains a stacked denoising autoencoder in a layer-by-layer fashion.
+# 2. Trains the stacked denoising autoencoder on the MNIST classification task.
 
 python3 sdae.py \
     --batch_size 128 \
     --learning_rate 0.005 \
-    --num_epochs 50 \
+    --num_epochs 30 \
     --model_key mnist_sae2 \
     --dataset mnist \
     --noise_type gs \
     --gaussian_stdev 0.4 \
-    --weight_decay 0.0000001
+    --weight_decay 0.0000001 \
+    --save_path ./stage1_sae.pth
+
+python3 mnist_classification.py \
+    --batch_size 128 \
+    --learning_rate 0.005 \
+    --num_epochs 10 \
+    --sae_model_key mnist_sae2 \
+    --sae_restore_path ./stage1_sae.pth \
+    --sae_save_path ./stage2_sae.pth \
+    --classifier_model_key mnist_dense_classifier2 \
+    --classifier_save_path ./stage2_classifier.pth \
+    --weight_decay 0.0000001 \
+    --loss_type nll

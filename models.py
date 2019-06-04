@@ -25,6 +25,11 @@ class SAE(nn.Module):
             return self.encoders[0][0].weight.data.cpu()
         return self.encoders[0][0].weight.data.cpu().numpy()
 
+    def get_block_parameters(self, ae_idx):
+        """Get parameters corresponding to a particular block."""
+        return list(self.encoders[ae_idx].parameters()) + \
+               list(self.decoders[self.num_blocks-ae_idx-1].parameters())
+
     def encode(self, x, ae_idx=None):
         """Encode the input. If AE_IDX is provided,
         encode with that particular encoder only."""
@@ -118,3 +123,20 @@ class MNISTSAE2(SAE):
         ])
         self.num_trained_blocks = 0
         self.num_blocks = len(self.encoders)
+
+
+class MNISTDenseClassifier2(nn.Module):
+    """MNIST classifier (two dense blocks)."""
+
+    def __init__(self, enc_out_features):
+        super(MNISTDenseClassifier2, self).__init__()
+
+        self.classifier = nn.Sequential(
+            nn.Linear(enc_out_features, 500),
+            nn.ReLU(),
+            nn.Linear(500, 10),
+            nn.LogSoftmax(dim=1),
+        )
+
+    def forward(self, x):
+        return self.classifier(x)

@@ -80,7 +80,7 @@ def save_image_wrapper(img, filepath):
 
 def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='olshausen_ae',
                dataset='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
-               restore_path=None, save_path='./sdae.pth', log_freq=10, olshausen_path=None,
+               restore_path=None, save_path='./stage1_sae.pth', log_freq=10, olshausen_path=None,
                olshausen_step_size=1, weight_decay=0, loss_type='mse', emph_wt_a=1, emph_wt_b=1):
     # set up log folders
     if not os.path.exists('./01_original'):
@@ -109,7 +109,6 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     }[loss_type.lower()]
     print('using %r as the loss' % (Loss,))
     criterion = Loss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     # load data
     data_minval, data_maxval = 0.0, 1.0
@@ -134,10 +133,14 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     warning_displayed = False
     original, noisy, output = None, None, None
     for ae_idx in range(model.num_blocks):
+
         # train one block at a time
         print('--------------------')
         print('training block %d/%d' % (ae_idx + 1, model.num_blocks))
         print('--------------------')
+        optimizer = torch.optim.Adam(
+            model.get_block_parameters(ae_idx), lr=learning_rate, weight_decay=weight_decay)
+
         for epoch in range(num_epochs):
             mean_loss = 0
             for batch_idx, data in enumerate(data_loader):
@@ -180,7 +183,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
 
             # =================== log ===================
             print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, mean_loss.item()))
-            if epoch % log_freq == 0:
+            if epoch % log_freq == 0 or epoch == num_epochs - 1:
                 if ae_idx == 0:
                     to_save = [
                         (to_img(original.data.cpu()), './01_original', 'original'),
@@ -210,7 +213,7 @@ if __name__ == '__main__':
     parser.add_argument('--gaussian_stdev', type=float, default=0.4)
     parser.add_argument('--sp_frac', type=float, default=0.1)
     parser.add_argument('--restore_path', type=str, default=None)
-    parser.add_argument('--save_path', type=str, default='./sdae.pth')
+    parser.add_argument('--save_path', type=str, default='./stage1_sae.pth')
     parser.add_argument('--log_freq', type=int, default=10)
     parser.add_argument('--olshausen_path', type=str, default=None)
     parser.add_argument('--olshausen_step_size', type=int, default=1)
