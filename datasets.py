@@ -84,6 +84,11 @@ class MNISTVariant(MNIST):
 
         if variant:
             self.variant = variant.lower()
+            if self.variant not in self.variant_options:
+                if self.variant.startswith('mnist'):
+                    self.variant = self.variant[5:]
+                if self.variant.startswith('_'):
+                    self.variant = self.variant[1:]
             assert self.variant in self.variant_options
             self.variant_folder = os.path.join(self.root, 'MNIST_%s' % self.variant, 'processed')
 

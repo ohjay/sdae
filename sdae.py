@@ -114,7 +114,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
 
     # load data
     data_minval, data_maxval = 0.0, 1.0
-    if dataset.lower().startswith('mnist'):
+    if dataset.lower().startswith('mnist') or dataset.lower() in MNISTVariant.variant_options:
         img_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Lambda(normalize),
