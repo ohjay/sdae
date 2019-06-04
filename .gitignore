@@ -6,3 +6,4 @@ data/
 03_output/
 04_filters/
 sdae.pth
+ckpt/

@@ -13,10 +13,9 @@ import torch.nn as nn
 from functools import reduce
 import matplotlib.pyplot as plt
 from torchvision import transforms
-from datasets import OlshausenDataset
-from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
+from datasets import OlshausenDataset, MNISTVariant
 
 
 def to_img(x):
@@ -115,12 +114,13 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
 
     # load data
     data_minval, data_maxval = 0.0, 1.0
-    if dataset.lower() == 'mnist':
+    if dataset.lower().startswith('mnist'):
         img_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Lambda(normalize),
         ])
-        dataset = MNIST(root='./data', train=True, transform=img_transform, download=True)
+        dataset = MNISTVariant(
+            './data', train=True, transform=img_transform, download=True, variant=dataset)
     elif dataset.lower() == 'olshausen':
         dataset = OlshausenDataset(
             olshausen_path, patch_size=12, step_size=olshausen_step_size, normalize=False)
