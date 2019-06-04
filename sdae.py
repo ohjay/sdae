@@ -119,8 +119,9 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
             transforms.ToTensor(),
             transforms.Lambda(normalize),
         ])
+        variant = None if dataset.lower() == 'mnist' else dataset
         dataset = MNISTVariant(
-            './data', train=True, transform=img_transform, download=True, variant=dataset)
+            './data', train=True, transform=img_transform, download=True, variant=variant)
     elif dataset.lower() == 'olshausen':
         dataset = OlshausenDataset(
             olshausen_path, patch_size=12, step_size=olshausen_step_size, normalize=False)
