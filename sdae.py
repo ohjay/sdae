@@ -101,8 +101,11 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
     print('using %r as the model' % (Model,))
     model = Model().cuda()
     if restore_path:
-        model.load_state_dict(torch.load(restore_path))
-        print('restored model from %s' % restore_path)
+        if os.path.exists(restore_path):
+            model.load_state_dict(torch.load(restore_path))
+            print('restored model from %s' % restore_path)
+        else:
+            print('warning: checkpoint %s not found, skipping...' % restore_path)
     Loss = {
         'mse': nn.MSELoss,
         'binary_cross_entropy': nn.BCELoss,

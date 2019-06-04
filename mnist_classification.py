@@ -12,6 +12,24 @@ def normalize(x):
     return (x - x.min()) / (x.max() - x.min())
 
 
+def init_classifier(in_features,
+                    classifier_model_key,
+                    classifier_restore_path):
+
+    Classifier = {
+        'mnist_dense_classifier2': MNISTDenseClassifier2,
+    }[classifier_model_key.lower()]
+    print('using %r as the classifier model' % (Classifier,))
+    classifier = Classifier(in_features).cuda()
+    if classifier_restore_path:
+        if os.path.exists(classifier_restore_path):
+            classifier.load_state_dict(torch.load(classifier_restore_path))
+            print('restored classifier from %s' % classifier_restore_path)
+        else:
+            print('warning: checkpoint %s not found, skipping...' % classifier_restore_path)
+    return classifier
+
+
 def init_sae_classifier(sae_model_key,
                         sae_restore_path,
                         classifier_model_key,
@@ -25,8 +43,12 @@ def init_sae_classifier(sae_model_key,
     }[sae_model_key.lower()]
     print('using %r as the SAE model' % (SAE_,))
     sae = SAE_().cuda()
-    sae.load_state_dict(torch.load(sae_restore_path))
-    print('restored SAE from %s' % sae_restore_path)
+    if sae_restore_path:
+        if os.path.exists(sae_restore_path):
+            sae.load_state_dict(torch.load(sae_restore_path))
+            print('restored SAE from %s' % sae_restore_path)
+        else:
+            print('warning: checkpoint %s not found, skipping...' % sae_restore_path)
     sae.num_trained_blocks = sae.num_blocks
 
     # obtain output dimensionality of final encoder
@@ -35,15 +57,8 @@ def init_sae_classifier(sae_model_key,
         if hasattr(module, 'out_features'):
             enc_out_features = module.out_features
 
-    # classifier
-    Classifier = {
-        'mnist_dense_classifier2': MNISTDenseClassifier2,
-    }[classifier_model_key.lower()]
-    print('using %r as the classifier model' % (Classifier,))
-    classifier = Classifier(enc_out_features).cuda()
-    if classifier_restore_path:
-        classifier.load_state_dict(torch.load(classifier_restore_path))
-        print('restored classifier from %s' % classifier_restore_path)
+    classifier = init_classifier(
+        enc_out_features, classifier_model_key, classifier_restore_path)
 
     return sae, classifier
 
@@ -78,22 +93,28 @@ def mnist_train(batch_size=128,
                 classifier_save_path='./stage2_classifier.pth',
                 log_freq=10,
                 weight_decay=0,
-                loss_type='nll'):
+                loss_type='nll',
+                no_sae=False):
 
-    sae, classifier = init_sae_classifier(
-        sae_model_key, sae_restore_path, classifier_model_key, classifier_restore_path)
+    if no_sae:
+        sae = None
+        classifier = init_classifier(28 * 28, classifier_model_key, classifier_restore_path)
+        parameters = classifier.parameters()
+    else:
+        sae, classifier = init_sae_classifier(
+            sae_model_key, sae_restore_path, classifier_model_key, classifier_restore_path)
+        parameters = list(sae.parameters()) + list(classifier.parameters())
+        sae.train()
+    classifier.train()
 
     # loss and optimization
     criterion = init_loss(loss_type)
-    parameters = list(sae.parameters()) + list(classifier.parameters())
     optimizer = torch.optim.Adam(parameters, lr=learning_rate, weight_decay=weight_decay)
 
     # load data
     data_loader = init_data_loader(True, batch_size)
 
     # training loop
-    sae.train()
-    classifier.train()
     for epoch in range(num_epochs):
         mean_loss = 0
         for batch_idx, (img, label) in enumerate(data_loader):
@@ -101,8 +122,11 @@ def mnist_train(batch_size=128,
             img, label = img.cuda(), label.cuda()
 
             # =============== forward ===============
-            z = sae.encode(img)
-            output = classifier(z)
+            if sae is not None:
+                z = sae.encode(img)
+                output = classifier(z)
+            else:
+                output = classifier(img)
             loss = criterion(output, label)
             mean_loss += (loss - mean_loss) / (batch_idx + 1)
 
@@ -114,8 +138,9 @@ def mnist_train(batch_size=128,
         # =================== log ===================
         print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, mean_loss.item()))
         if epoch % log_freq == 0 or epoch == num_epochs - 1:
-            torch.save(sae.state_dict(), sae_save_path)
-            print('[o] saved SAE to %s' % sae_save_path)
+            if sae is not None:
+                torch.save(sae.state_dict(), sae_save_path)
+                print('[o] saved SAE to %s' % sae_save_path)
             torch.save(classifier.state_dict(), classifier_save_path)
             print('[o] saved classifier to %s' % classifier_save_path)
 
@@ -125,18 +150,23 @@ def mnist_eval(batch_size=128,
                sae_restore_path='./stage2_sae.pth',
                classifier_model_key='mnist_dense_classifier2',
                classifier_restore_path='./stage2_classifier.pth',
-               loss_type='nll'):
+               loss_type='nll',
+               no_sae=False):
 
-    sae, classifier = init_sae_classifier(
-        sae_model_key, sae_restore_path, classifier_model_key, classifier_restore_path)
+    if no_sae:
+        sae = None
+        classifier = init_classifier(28 * 28, classifier_model_key, classifier_restore_path)
+    else:
+        sae, classifier = init_sae_classifier(
+            sae_model_key, sae_restore_path, classifier_model_key, classifier_restore_path)
+        sae.eval()
+    classifier.eval()
 
     criterion = init_loss(loss_type, reduction='sum')
 
     # load data
     data_loader = init_data_loader(False, batch_size)
 
-    sae.eval()
-    classifier.eval()
     total_loss, num_correct = 0, 0
     with torch.no_grad():
         for img, label in data_loader:
@@ -144,8 +174,11 @@ def mnist_eval(batch_size=128,
             img, label = img.cuda(), label.cuda()
 
             # =============== forward ===============
-            z = sae.encode(img)
-            output = classifier(z)  # log-probabilities
+            if sae is not None:
+                z = sae.encode(img)
+                output = classifier(z)
+            else:
+                output = classifier(img)
             total_loss += criterion(output, label).item()
             prediction = output.argmax(dim=1, keepdim=True)
             num_correct += prediction.eq(label.view_as(prediction)).sum().item()
@@ -170,6 +203,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--loss_type', type=str, default='nll')
     parser.add_argument('--no_train', action='store_true')
+    parser.add_argument('--no_sae', action='store_true')
 
     args = parser.parse_args()
     print(args)
@@ -191,7 +225,8 @@ if __name__ == '__main__':
                     args.classifier_save_path,
                     args.log_freq,
                     args.weight_decay,
-                    args.loss_type)
+                    args.loss_type,
+                    args.no_sae)
         args.sae_restore_path = args.sae_save_path
         args.classifier_restore_path = args.classifier_save_path
 
@@ -204,4 +239,5 @@ if __name__ == '__main__':
                args.sae_restore_path,
                args.classifier_model_key,
                args.classifier_restore_path,
-               args.loss_type)
+               args.loss_type,
+               args.no_sae)

@@ -3,7 +3,7 @@
 # experiment08
 # ------------
 # 1. Pretrains a stacked denoising autoencoder in a layer-by-layer fashion.
-# 2. Trains the stacked denoising autoencoder on the MNIST classification task.
+# 2. Trains the stacked encoder + classifier on the MNIST classification task.
 
 python3 sdae.py \
     --batch_size 128 \
