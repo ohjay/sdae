@@ -1,5 +1,5 @@
+import torch
 import argparse
-from modules import *
 import torch.nn as nn
 from datasets import MNISTVariant
 from torchvision import transforms

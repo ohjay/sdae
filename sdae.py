@@ -4,8 +4,8 @@ Code originally based on https://github.com/L1aoXingyu/pytorch-beginner/tree/mas
 """
 
 import os
+import torch
 import argparse
-from modules import *
 import torch.nn as nn
 from torchvision import transforms
 from torch.utils.data import DataLoader

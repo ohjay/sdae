@@ -1,5 +1,5 @@
+import torch
 import argparse
-from modules import *
 from utils import init_model
 import matplotlib.pyplot as plt
 from torchvision import transforms
