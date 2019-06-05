@@ -176,15 +176,15 @@ class VAE(nn.Module):
 
 
 class VAELoss(nn.Module):
-    def __init__(self, reduction='mean', loss_type='mse'):
+    def __init__(self, reduction='sum', reconstruction_loss_type='mse'):
         super(VAELoss, self).__init__()
         self.reduction = reduction
-        self.loss_type = loss_type.lower()
-        assert self.loss_type in {'mse', 'bce'}
+        self.reconstruction_loss_type = reconstruction_loss_type.lower()
+        assert self.reconstruction_loss_type in {'mse', 'bce', 'binary_cross_entropy'}
 
     def forward(self, input_, target, mean, log_var):
         # reconstruction
-        if self.loss_type == 'mse':
+        if self.reconstruction_loss_type == 'mse':
             reconstruction_loss = F.mse_loss(input_, target, reduction=self.reduction)
         else:
             reconstruction_loss = F.binary_cross_entropy(input_, target, reduction=self.reduction)
@@ -211,7 +211,6 @@ class MNISTVAE(VAE):
         )
         self.log_var_estimator = nn.Sequential(
             nn.Linear(in_features=400, out_features=20),
-            nn.Sigmoid(),
         )
         self.decoder = nn.Sequential(
             nn.Linear(in_features=20, out_features=400),

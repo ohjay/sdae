@@ -78,7 +78,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='
                            emph_wt_b * criterion(output[1 - affected], original[1 - affected])
                 else:
                     loss = criterion(output, original)
-                mean_loss += (loss - mean_loss) / (batch_idx + 1)
+                mean_loss += (loss - mean_loss) / (batch_idx + 1)  # assumes `loss` is mean for batch
 
                 # =============== backward ==============
                 optimizer.zero_grad()
