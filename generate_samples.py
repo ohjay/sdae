@@ -1,5 +1,6 @@
 import argparse
-from models import *
+from modules import *
+from utils import init_model
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -23,7 +24,7 @@ def plot_samples(samples, fig_save_path=None):
     plt.show()
 
 
-def generate_samples(model_key,
+def generate_samples(model_class,
                      dataset,
                      restore_path,
                      olshausen_path=None,
@@ -32,15 +33,7 @@ def generate_samples(model_key,
                      num_variations=5,
                      fig_save_path=None):
 
-    Model = {
-        'mnist_ae': MNISTAE,
-        'mnist_sae2': MNISTSAE2,
-        'olshausen_ae': OlshausenAE,
-    }[model_key.lower()]
-    print('using %r as the model' % (Model,))
-    model = Model().cuda()
-    model.load_state_dict(torch.load(restore_path))
-    print('restored model from %s' % restore_path)
+    model = init_model(model_class, restore_path, restore_required=True)
     model.num_trained_blocks = model.num_blocks
     model.eval()
 
@@ -88,7 +81,7 @@ def generate_samples(model_key,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_key', type=str, default='mnist_sae2')
+    parser.add_argument('--model_class', type=str, default='MNISTSAE2')
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--restore_path', type=str, default=None)
     parser.add_argument('--olshausen_path', type=str, default=None)
@@ -101,7 +94,7 @@ if __name__ == '__main__':
     print(args)
     print('----------')
 
-    generate_samples(args.model_key,
+    generate_samples(args.model_class,
                      args.dataset,
                      args.restore_path,
                      args.olshausen_path,

@@ -4,90 +4,17 @@ Code originally based on https://github.com/L1aoXingyu/pytorch-beginner/tree/mas
 """
 
 import os
-import torch
-import operator
 import argparse
-import numpy as np
-from models import *
+from modules import *
 import torch.nn as nn
-from functools import reduce
-import matplotlib.pyplot as plt
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from torchvision.utils import save_image
 from datasets import OlshausenDataset, MNISTVariant
+from utils import to_img, normalize, zero_mask, add_gaussian, \
+    salt_and_pepper, plot_first_layer_weights, save_image_wrapper, init_model
 
 
-def to_img(x):
-    h = w = int(np.sqrt(
-        reduce(operator.mul, list(x.size())[1:], 1)))
-    x = x.view(x.size(0), 1, h, w)
-    return x
-
-
-def normalize(x):
-    return (x - x.min()) / (x.max() - x.min())
-
-
-def zero_mask(x, zero_frac):
-    """Apply zero-masking noise to a PyTorch tensor.
-    Returns noisy X and a bitmask describing the affected locations."""
-    bitmask = torch.rand_like(x) > zero_frac  # approx. ZERO_FRAC zeros
-    return x * bitmask.float(), bitmask  # assumes the minimum value is 0
-
-
-def add_gaussian(x, gaussian_stdev):
-    """Apply isotropic additive Gaussian noise to a PyTorch tensor.
-    Returns noisy X and a bitmask describing the affected locations."""
-    noise = torch.empty_like(x).normal_(0, gaussian_stdev)
-    return x + noise, torch.ones_like(x, dtype=torch.uint8)
-
-
-def salt_and_pepper(x, sp_frac, minval=0.0, maxval=1.0):
-    """Apply salt-and-pepper noise to a PyTorch tensor.
-    Returns noisy X and a bitmask describing the affected locations."""
-    rand = torch.rand_like(x)
-    min_idxs = rand < (sp_frac / 2.0)
-    max_idxs = rand > (1.0 - sp_frac / 2.0)
-    x_sp = x.clone()
-    x_sp[min_idxs] = minval
-    x_sp[max_idxs] = maxval
-    return x_sp, torch.clamp(min_idxs + max_idxs, 0, 1)
-
-
-def plot_first_layer_weights(model, weight_h=None, weight_w=None, block_on_viz=False):
-    weights = model.get_first_layer_weights()
-    print('shape of first-layer weights: %r' % (weights.shape,))
-
-    if not block_on_viz:
-        plt.ion()
-        plt.show()
-
-    fig, ax = plt.subplots(nrows=5, ncols=10)
-    i = 0
-    for row in ax:
-        for col in row:
-            weight = weights[i, :]
-            if not weight_h or not weight_w:
-                # Infer height and width of weight, assuming it is square
-                weight_h = weight_w = int(np.sqrt(weight.size))
-            col.imshow(np.reshape(weights[i, :], (weight_h, weight_w)), cmap='gray')
-            col.axis('off')
-            i += 1
-
-    if not block_on_viz:
-        plt.pause(10)
-        plt.close()
-    else:
-        plt.show()
-
-
-def save_image_wrapper(img, filepath):
-    save_image(img, filepath)
-    print('[o] saved image to %s' % filepath)
-
-
-def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='olshausen_ae',
+def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='OlshausenAE',
                dataset='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
                restore_path=None, save_path='./stage1_sae.pth', log_freq=10, olshausen_path=None,
                olshausen_step_size=1, weight_decay=0, loss_type='mse', emph_wt_a=1, emph_wt_b=1):
@@ -102,21 +29,10 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_key='ol
         os.makedirs('./04_filters')
 
     # set up model and optimizer
-    Model = {
-        'mnist_ae': MNISTAE,
-        'mnist_sae2': MNISTSAE2,
-        'olshausen_ae': OlshausenAE,
-    }[model_key.lower()]
-    print('using %r as the model' % (Model,))
-    model = Model().cuda()
-    if restore_path:
-        if os.path.exists(restore_path):
-            model.load_state_dict(torch.load(restore_path))
-            print('restored model from %s' % restore_path)
-        else:
-            print('warning: checkpoint %s not found, skipping...' % restore_path)
+    model = init_model(model_class, restore_path, restore_required=False)
     Loss = {
         'mse': nn.MSELoss,
+        'bce': nn.BCELoss,
         'binary_cross_entropy': nn.BCELoss,
     }[loss_type.lower()]
     print('using %r as the loss' % (Loss,))
@@ -220,7 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=1e-2)
     parser.add_argument('--num_epochs', type=int, default=100)
-    parser.add_argument('--model_key', type=str, default='olshausen_ae')
+    parser.add_argument('--model_class', type=str, default='OlshausenAE')
     parser.add_argument('--dataset', type=str, default='olshausen')
     parser.add_argument('--noise_type', type=str, default='gs')
     parser.add_argument('--zero_frac', type=float, default=0.3)
@@ -241,6 +157,6 @@ if __name__ == '__main__':
     print('----------')
 
     train_sdae(
-        args.batch_size, args.learning_rate, args.num_epochs, args.model_key, args.dataset, args.noise_type,
+        args.batch_size, args.learning_rate, args.num_epochs, args.model_class, args.dataset, args.noise_type,
         args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path, args.save_path, args.log_freq,
         args.olshausen_path, args.olshausen_step_size, args.weight_decay, args.loss_type, args.emph_wt_a, args.emph_wt_b)

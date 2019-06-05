@@ -140,3 +140,82 @@ class MNISTDenseClassifier2(nn.Module):
 
     def forward(self, x):
         return self.classifier(x)
+
+
+class VAE(nn.Module):
+    """Variational autoencoder."""
+
+    def __init__(self):
+        super(VAE, self).__init__()
+
+        self.encoder = nn.Sequential()
+        self.mean_estimator = nn.Sequential()
+        self.log_var_estimator = nn.Sequential()
+        self.decoder = nn.Sequential()
+
+    def forward(self, x):
+        mean, log_var = self.encode(x)
+
+        # reparameterization trick
+        # ------------------------
+        # MEAN and LOG_VAR are "mu" and log("sigma" ^2) using
+        # the notation from eq. 10 in Auto-Encoding Variational Bayes
+        # -----------------------------------------------------------
+        stdev = torch.exp(0.5 * log_var)
+        epsilon = torch.randn_like(stdev)
+        z = mean + stdev * epsilon  # sampled latent vector
+
+        return self.decode(z), mean, log_var
+
+    def encode(self, x):
+        x = self.encoder(x)
+        return self.mean_estimator(x), self.log_var_estimator(x)
+
+    def decode(self, z):
+        return self.decoder(z)
+
+
+class VAELoss(nn.Module):
+    def __init__(self, reduction='mean', loss_type='mse'):
+        super(VAELoss, self).__init__()
+        self.reduction = reduction
+        self.loss_type = loss_type.lower()
+        assert self.loss_type in {'mse', 'bce'}
+
+    def forward(self, input_, target, mean, log_var):
+        # reconstruction
+        if self.loss_type == 'mse':
+            reconstruction_loss = F.mse_loss(input_, target, reduction=self.reduction)
+        else:
+            reconstruction_loss = F.binary_cross_entropy(input_, target, reduction=self.reduction)
+
+        # regularization
+        kl_div = 0.5 * torch.sum(mean * mean + torch.exp(log_var) - log_var - 1, dim=1)
+        kl_div = torch.mean(kl_div) if self.reduction == 'mean' else torch.sum(kl_div)
+
+        return reconstruction_loss + kl_div
+
+
+class MNISTVAE(VAE):
+    """MNIST variational autoencoder."""
+
+    def __init__(self):
+        super(MNISTVAE, self).__init__()
+
+        self.encoder = nn.Sequential(
+            nn.Linear(in_features=28*28, out_features=400),
+            nn.ReLU(),
+        )
+        self.mean_estimator = nn.Sequential(
+            nn.Linear(in_features=400, out_features=20),
+        )
+        self.log_var_estimator = nn.Sequential(
+            nn.Linear(in_features=400, out_features=20),
+            nn.Sigmoid(),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(in_features=20, out_features=400),
+            nn.ReLU(),
+            nn.Linear(in_features=400, out_features=28*28),
+            nn.Sigmoid(),
+        )

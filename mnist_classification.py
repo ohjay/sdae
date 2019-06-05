@@ -1,54 +1,20 @@
-import os
-import torch
 import argparse
-from models import *
+from modules import *
 import torch.nn as nn
 from datasets import MNISTVariant
 from torchvision import transforms
 from torch.utils.data import DataLoader
+from utils import normalize, init_model
 
 
-def normalize(x):
-    return (x - x.min()) / (x.max() - x.min())
-
-
-def init_classifier(in_features,
-                    classifier_model_key,
-                    classifier_restore_path):
-
-    Classifier = {
-        'mnist_dense_classifier2': MNISTDenseClassifier2,
-    }[classifier_model_key.lower()]
-    print('using %r as the classifier model' % (Classifier,))
-    classifier = Classifier(in_features).cuda()
-    if classifier_restore_path:
-        if os.path.exists(classifier_restore_path):
-            classifier.load_state_dict(torch.load(classifier_restore_path))
-            print('restored classifier from %s' % classifier_restore_path)
-        else:
-            print('warning: checkpoint %s not found, skipping...' % classifier_restore_path)
-    return classifier
-
-
-def init_sae_classifier(sae_model_key,
+def init_sae_classifier(sae_model_class,
                         sae_restore_path,
-                        classifier_model_key,
+                        classifier_model_class,
                         classifier_restore_path):
 
     # stacked autoencoder
     # SAE_ is the SAE subclass whose encoders should be utilized
-    SAE_ = {
-        'mnist_ae': MNISTAE,
-        'mnist_sae2': MNISTSAE2,
-    }[sae_model_key.lower()]
-    print('using %r as the SAE model' % (SAE_,))
-    sae = SAE_().cuda()
-    if sae_restore_path:
-        if os.path.exists(sae_restore_path):
-            sae.load_state_dict(torch.load(sae_restore_path))
-            print('restored SAE from %s' % sae_restore_path)
-        else:
-            print('warning: checkpoint %s not found, skipping...' % sae_restore_path)
+    sae = init_model(sae_model_class, sae_restore_path, False)
     sae.num_trained_blocks = sae.num_blocks
 
     # obtain output dimensionality of final encoder
@@ -57,8 +23,10 @@ def init_sae_classifier(sae_model_key,
         if hasattr(module, 'out_features'):
             enc_out_features = module.out_features
 
-    classifier = init_classifier(
-        enc_out_features, classifier_model_key, classifier_restore_path)
+    classifier = init_model(classifier_model_class,
+                            classifier_restore_path,
+                            restore_required=False,
+                            enc_out_features=enc_out_features)
 
     return sae, classifier
 
@@ -86,10 +54,10 @@ def init_data_loader(train, batch_size, mnist_variant=None):
 def mnist_train(batch_size=128,
                 learning_rate=1e-2,
                 num_epochs=100,
-                sae_model_key='mnist_sae2',
+                sae_model_class='MNISTSAE2',
                 sae_restore_path='./stage1_sae.pth',
                 sae_save_path='./stage2_sae.pth',
-                classifier_model_key='mnist_dense_classifier2',
+                classifier_model_class='MNISTDenseClassifier2',
                 classifier_restore_path=None,
                 classifier_save_path='./stage2_classifier.pth',
                 log_freq=10,
@@ -100,11 +68,12 @@ def mnist_train(batch_size=128,
 
     if no_sae:
         sae = None
-        classifier = init_classifier(28 * 28, classifier_model_key, classifier_restore_path)
+        classifier = init_model(
+            classifier_model_class, classifier_restore_path, False, enc_out_features=28*28)
         parameters = classifier.parameters()
     else:
         sae, classifier = init_sae_classifier(
-            sae_model_key, sae_restore_path, classifier_model_key, classifier_restore_path)
+            sae_model_class, sae_restore_path, classifier_model_class, classifier_restore_path)
         parameters = list(sae.parameters()) + list(classifier.parameters())
         sae.train()
     classifier.train()
@@ -148,9 +117,9 @@ def mnist_train(batch_size=128,
 
 
 def mnist_eval(batch_size=128,
-               sae_model_key='mnist_sae2',
+               sae_model_class='MNISTSAE2',
                sae_restore_path='./stage2_sae.pth',
-               classifier_model_key='mnist_dense_classifier2',
+               classifier_model_class='MNISTDenseClassifier2',
                classifier_restore_path='./stage2_classifier.pth',
                loss_type='nll',
                no_sae=False,
@@ -158,10 +127,11 @@ def mnist_eval(batch_size=128,
 
     if no_sae:
         sae = None
-        classifier = init_classifier(28 * 28, classifier_model_key, classifier_restore_path)
+        classifier = init_model(
+            classifier_model_class, classifier_restore_path, False, enc_out_features=28*28)
     else:
         sae, classifier = init_sae_classifier(
-            sae_model_key, sae_restore_path, classifier_model_key, classifier_restore_path)
+            sae_model_class, sae_restore_path, classifier_model_class, classifier_restore_path)
         sae.eval()
     classifier.eval()
 
@@ -196,10 +166,10 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=1e-2)
     parser.add_argument('--num_epochs', type=int, default=100)
-    parser.add_argument('--sae_model_key', type=str, default='mnist_sae2')
+    parser.add_argument('--sae_model_class', type=str, default='MNISTSAE2')
     parser.add_argument('--sae_restore_path', type=str, default='./stage1_sae.pth')
     parser.add_argument('--sae_save_path', type=str, default='./stage2_sae.pth')
-    parser.add_argument('--classifier_model_key', type=str, default='mnist_dense_classifier2')
+    parser.add_argument('--classifier_model_class', type=str, default='MNISTDenseClassifier2')
     parser.add_argument('--classifier_restore_path', type=str, default=None)
     parser.add_argument('--classifier_save_path', type=str, default='./stage2_classifier.pth')
     parser.add_argument('--log_freq', type=int, default=10)
@@ -221,10 +191,10 @@ if __name__ == '__main__':
         mnist_train(args.batch_size,
                     args.learning_rate,
                     args.num_epochs,
-                    args.sae_model_key,
+                    args.sae_model_class,
                     args.sae_restore_path,
                     args.sae_save_path,
-                    args.classifier_model_key,
+                    args.classifier_model_class,
                     args.classifier_restore_path,
                     args.classifier_save_path,
                     args.log_freq,
@@ -240,9 +210,9 @@ if __name__ == '__main__':
           '= EVAL =\n'
           '========\n')
     mnist_eval(args.batch_size,
-               args.sae_model_key,
+               args.sae_model_class,
                args.sae_restore_path,
-               args.classifier_model_key,
+               args.classifier_model_class,
                args.classifier_restore_path,
                args.loss_type,
                args.no_sae,

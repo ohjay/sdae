@@ -5,7 +5,7 @@
 # Generate samples using the SDAE trained during experiment 12.
 
 python3 generate_samples.py \
-    --model_key mnist_sae2 \
+    --model_class MNISTSAE2 \
     --dataset mnist \
     --restore_path ./ckpt/stage1_sdae.pth \
     --num_originals 10 \

@@ -9,7 +9,7 @@ python3 sdae.py \
     --batch_size 128 \
     --learning_rate 0.005 \
     --num_epochs 100 \
-    --model_key mnist_sae2 \
+    --model_class MNISTSAE2 \
     --dataset rot \
     --noise_type gs \
     --gaussian_stdev 0.4 \
