@@ -6,9 +6,8 @@ Code originally based on https://github.com/L1aoXingyu/pytorch-beginner/tree/mas
 import os
 import torch
 import argparse
-import torch.nn as nn
 from utils import to_img, zero_mask, add_gaussian, salt_and_pepper, \
-    plot_first_layer_weights, save_image_wrapper, init_model, init_data_loader
+    plot_first_layer_weights, save_image_wrapper, init_model, init_loss, init_data_loader
 
 
 def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='OlshausenAE',
@@ -27,13 +26,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='
 
     # set up model and criterion
     model = init_model(model_class, restore_path, restore_required=False)
-    Loss = {
-        'mse': nn.MSELoss,
-        'bce': nn.BCELoss,
-        'binary_cross_entropy': nn.BCELoss,
-    }[loss_type.lower()]
-    print('using %r as the loss' % (Loss,))
-    criterion = Loss()
+    criterion = init_loss(loss_type)
 
     # load data
     data_loader, _, _, data_minval, data_maxval = init_data_loader(

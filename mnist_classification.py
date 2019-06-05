@@ -1,7 +1,6 @@
 import torch
 import argparse
-import torch.nn as nn
-from utils import init_model, init_data_loader
+from utils import init_model, init_loss, init_data_loader
 
 
 def init_sae_classifier(sae_model_class,
@@ -26,16 +25,6 @@ def init_sae_classifier(sae_model_class,
                             enc_out_features=enc_out_features)
 
     return sae, classifier
-
-
-def init_loss(loss_type, **loss_kwargs):
-    Loss = {
-        'mse': nn.MSELoss,
-        'binary_cross_entropy': nn.BCELoss,
-        'nll': nn.NLLLoss,
-    }[loss_type.lower()]
-    print('using %r as the loss' % (Loss,))
-    return Loss(**loss_kwargs)
 
 
 def mnist_train(batch_size=128,

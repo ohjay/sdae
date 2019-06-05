@@ -3,6 +3,7 @@ import torch
 import modules
 import operator
 import numpy as np
+import torch.nn as nn
 from functools import reduce
 import matplotlib.pyplot as plt
 from torchvision import transforms
@@ -92,6 +93,18 @@ def init_model(model_class, restore_path, restore_required, **model_kwargs):
         else:
             print('warning: checkpoint %s not found, skipping...' % restore_path)
     return model
+
+
+def init_loss(loss_type, **loss_kwargs):
+    Loss = {
+        'mse': nn.MSELoss,
+        'bce': nn.BCELoss,
+        'binary_cross_entropy': nn.BCELoss,
+        'nll': nn.NLLLoss,
+        'vae': modules.VAELoss,
+    }[loss_type.lower()]
+    print('using %r as the loss' % (Loss,))
+    return Loss(**loss_kwargs)
 
 
 def init_data_loader(dataset_key,
