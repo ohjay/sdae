@@ -13,7 +13,6 @@ def init_sae_classifier(sae_model_class,
                         classifier_restore_path):
 
     # stacked autoencoder
-    # SAE_ is the SAE subclass whose encoders should be utilized
     sae = init_model(sae_model_class, sae_restore_path, False)
     sae.num_trained_blocks = sae.num_blocks
 
@@ -23,6 +22,7 @@ def init_sae_classifier(sae_model_class,
         if hasattr(module, 'out_features'):
             enc_out_features = module.out_features
 
+    # classifier
     classifier = init_model(classifier_model_class,
                             classifier_restore_path,
                             restore_required=False,
