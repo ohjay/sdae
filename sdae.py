@@ -7,15 +7,12 @@ import os
 import torch
 import argparse
 import torch.nn as nn
-from torchvision import transforms
-from torch.utils.data import DataLoader
-from datasets import OlshausenDataset, MNISTVariant
-from utils import to_img, normalize, zero_mask, add_gaussian, \
-    salt_and_pepper, plot_first_layer_weights, save_image_wrapper, init_model
+from utils import to_img, zero_mask, add_gaussian, salt_and_pepper, \
+    plot_first_layer_weights, save_image_wrapper, init_model, init_data_loader
 
 
 def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='OlshausenAE',
-               dataset='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
+               dataset_key='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
                restore_path=None, save_path='./stage1_sae.pth', log_freq=10, olshausen_path=None,
                olshausen_step_size=1, weight_decay=0, loss_type='mse', emph_wt_a=1, emph_wt_b=1):
     # set up log folders
@@ -28,7 +25,7 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='
     if not os.path.exists('./04_filters'):
         os.makedirs('./04_filters')
 
-    # set up model and optimizer
+    # set up model and criterion
     model = init_model(model_class, restore_path, restore_required=False)
     Loss = {
         'mse': nn.MSELoss,
@@ -39,24 +36,8 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='
     criterion = Loss()
 
     # load data
-    data_minval, data_maxval = 0.0, 1.0
-    if dataset.lower().startswith('mnist') or dataset.lower() in MNISTVariant.variant_options:
-        img_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Lambda(normalize),
-        ])
-        variant = None if dataset.lower() == 'mnist' else dataset
-        dataset = MNISTVariant(
-            './data', train=True, transform=img_transform, download=True, variant=variant)
-    elif dataset.lower() == 'olshausen':
-        dataset = OlshausenDataset(
-            olshausen_path, patch_size=12, step_size=olshausen_step_size, normalize=False)
-        data_minval = dataset.get_minval()
-        data_maxval = dataset.get_maxval()
-    else:
-        print('unrecognized dataset: %r' % (dataset,))
-        print('error incoming...')
-    data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+    data_loader, _, _, data_minval, data_maxval = init_data_loader(
+        dataset_key, True, batch_size, olshausen_path, olshausen_step_size)
 
     # training loop
     affected = None
@@ -137,7 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=1e-2)
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--model_class', type=str, default='OlshausenAE')
-    parser.add_argument('--dataset', type=str, default='olshausen')
+    parser.add_argument('--dataset_key', type=str, default='olshausen')
     parser.add_argument('--noise_type', type=str, default='gs')
     parser.add_argument('--zero_frac', type=float, default=0.3)
     parser.add_argument('--gaussian_stdev', type=float, default=0.4)
@@ -157,6 +138,6 @@ if __name__ == '__main__':
     print('----------')
 
     train_sdae(
-        args.batch_size, args.learning_rate, args.num_epochs, args.model_class, args.dataset, args.noise_type,
+        args.batch_size, args.learning_rate, args.num_epochs, args.model_class, args.dataset_key, args.noise_type,
         args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path, args.save_path, args.log_freq,
         args.olshausen_path, args.olshausen_step_size, args.weight_decay, args.loss_type, args.emph_wt_a, args.emph_wt_b)

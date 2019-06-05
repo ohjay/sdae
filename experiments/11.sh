@@ -10,7 +10,7 @@ python3 sdae.py \
     --learning_rate 0.005 \
     --num_epochs 50 \
     --model_class MNISTSAE2 \
-    --dataset mnist \
+    --dataset_key mnist \
     --noise_type n/a \
     --weight_decay 0.0000001 \
     --save_path ./stage1_sae.pth

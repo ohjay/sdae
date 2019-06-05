@@ -1,10 +1,7 @@
 import torch
 import argparse
-from utils import init_model
 import matplotlib.pyplot as plt
-from torchvision import transforms
-from torch.utils.data import DataLoader
-from datasets import OlshausenDataset, MNISTVariant
+from utils import init_model, init_data_loader
 
 
 def plot_samples(samples, fig_save_path=None):
@@ -25,7 +22,7 @@ def plot_samples(samples, fig_save_path=None):
 
 
 def generate_samples(model_class,
-                     dataset,
+                     dataset_key,
                      restore_path,
                      olshausen_path=None,
                      olshausen_step_size=1,
@@ -38,24 +35,9 @@ def generate_samples(model_class,
     model.eval()
 
     # load data
-    sample_h, sample_w = None, None
-    if dataset.lower().startswith('mnist') or dataset.lower() in MNISTVariant.variant_options:
-        img_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Lambda(lambda x: (x - x.min()) / (x.max() - x.min())),
-        ])
-        variant = None if dataset.lower() == 'mnist' else dataset
-        dataset = MNISTVariant(
-            './data', train=True, transform=img_transform, download=True, variant=variant)
-        sample_h, sample_w = 28, 28
-    elif dataset.lower() == 'olshausen':
-        dataset = OlshausenDataset(
-            olshausen_path, patch_size=12, step_size=olshausen_step_size, normalize=False)
-        sample_h, sample_w = 12, 12
-    else:
-        print('unrecognized dataset: %r' % (dataset,))
-        print('error incoming...')
-    data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
+    batch_size = 1
+    data_loader, sample_h, sample_w, _, _ = init_data_loader(
+        dataset_key, True, batch_size, olshausen_path, olshausen_step_size)
 
     # generate samples
     with torch.no_grad():
@@ -82,7 +64,7 @@ def generate_samples(model_class,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_class', type=str, default='MNISTSAE2')
-    parser.add_argument('--dataset', type=str, default='mnist')
+    parser.add_argument('--dataset_key', type=str, default='mnist')
     parser.add_argument('--restore_path', type=str, default=None)
     parser.add_argument('--olshausen_path', type=str, default=None)
     parser.add_argument('--olshausen_step_size', type=int, default=1)
@@ -95,7 +77,7 @@ if __name__ == '__main__':
     print('----------')
 
     generate_samples(args.model_class,
-                     args.dataset,
+                     args.dataset_key,
                      args.restore_path,
                      args.olshausen_path,
                      args.olshausen_step_size,

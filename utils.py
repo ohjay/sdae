@@ -5,7 +5,10 @@ import operator
 import numpy as np
 from functools import reduce
 import matplotlib.pyplot as plt
+from torchvision import transforms
+from torch.utils.data import DataLoader
 from torchvision.utils import save_image
+from datasets import OlshausenDataset, MNISTVariant
 
 
 def to_img(x):
@@ -89,3 +92,40 @@ def init_model(model_class, restore_path, restore_required, **model_kwargs):
         else:
             print('warning: checkpoint %s not found, skipping...' % restore_path)
     return model
+
+
+def init_data_loader(dataset_key,
+                     train_ver=True,
+                     batch_size=128,
+                     olshausen_path=None,
+                     olshausen_step_size=1):
+
+    dataset_key = dataset_key.lower()
+    if dataset_key.startswith('mnist') \
+            or dataset_key in MNISTVariant.variant_options:
+        # MNIST or MNIST variant
+        img_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Lambda(normalize),
+        ])
+        variant = None if dataset_key == 'mnist' else dataset_key
+        dataset = MNISTVariant('./data',
+                               train=train_ver,
+                               transform=img_transform,
+                               download=True,
+                               variant=variant)
+        sample_h, sample_w = 28, 28
+        data_minval, data_maxval = 0.0, 1.0
+    elif dataset_key.startswith('olshausen'):
+        # Olshausen natural scenes
+        dataset = OlshausenDataset(olshausen_path,
+                                   patch_size=12,
+                                   step_size=olshausen_step_size,
+                                   normalize=False)
+        sample_h, sample_w = 12, 12
+        data_minval = dataset.get_minval()
+        data_maxval = dataset.get_maxval()
+    else:
+        raise ValueError('unrecognized dataset: %s' % dataset_key)
+    data_loader = DataLoader(dataset, batch_size, shuffle=True)
+    return data_loader, sample_h, sample_w, data_minval, data_maxval

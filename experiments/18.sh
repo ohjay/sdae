@@ -6,7 +6,7 @@
 
 python3 generate_samples.py \
     --model_class MNISTSAE2 \
-    --dataset mnist \
+    --dataset_key mnist \
     --restore_path ./ckpt/stage1_sdae.pth \
     --num_originals 10 \
     --num_variations 15 \

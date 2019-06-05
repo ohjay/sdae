@@ -1,10 +1,7 @@
 import torch
 import argparse
 import torch.nn as nn
-from datasets import MNISTVariant
-from torchvision import transforms
-from torch.utils.data import DataLoader
-from utils import normalize, init_model
+from utils import init_model, init_data_loader
 
 
 def init_sae_classifier(sae_model_class,
@@ -41,16 +38,6 @@ def init_loss(loss_type, **loss_kwargs):
     return Loss(**loss_kwargs)
 
 
-def init_data_loader(train, batch_size, mnist_variant=None):
-    img_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Lambda(normalize),
-    ])
-    dataset = MNISTVariant(
-        './data', train, img_transform, download=True, variant=mnist_variant)
-    return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
-
-
 def mnist_train(batch_size=128,
                 learning_rate=1e-2,
                 num_epochs=100,
@@ -64,7 +51,7 @@ def mnist_train(batch_size=128,
                 weight_decay=0,
                 loss_type='nll',
                 no_sae=False,
-                mnist_variant=None):
+                mnist_variant='mnist'):
 
     if no_sae:
         sae = None
@@ -83,7 +70,7 @@ def mnist_train(batch_size=128,
     optimizer = torch.optim.Adam(parameters, lr=learning_rate, weight_decay=weight_decay)
 
     # load data
-    data_loader = init_data_loader(True, batch_size, mnist_variant)
+    data_loader, _, _, _, _ = init_data_loader(mnist_variant, True, batch_size)
 
     # training loop
     for epoch in range(num_epochs):
@@ -123,7 +110,7 @@ def mnist_eval(batch_size=128,
                classifier_restore_path='./stage2_classifier.pth',
                loss_type='nll',
                no_sae=False,
-               mnist_variant=None):
+               mnist_variant='mnist'):
 
     if no_sae:
         sae = None
@@ -135,10 +122,11 @@ def mnist_eval(batch_size=128,
         sae.eval()
     classifier.eval()
 
+    # loss
     criterion = init_loss(loss_type, reduction='sum')
 
     # load data
-    data_loader = init_data_loader(False, batch_size, mnist_variant)
+    data_loader, _, _, _, _ = init_data_loader(mnist_variant, False, batch_size)
 
     total_loss, num_correct = 0, 0
     with torch.no_grad():
@@ -177,7 +165,7 @@ if __name__ == '__main__':
     parser.add_argument('--loss_type', type=str, default='nll')
     parser.add_argument('--no_train', action='store_true')
     parser.add_argument('--no_sae', action='store_true')
-    parser.add_argument('--mnist_variant', type=str, default=None)
+    parser.add_argument('--mnist_variant', type=str, default='mnist')
 
     args = parser.parse_args()
     print(args)

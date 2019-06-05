@@ -11,7 +11,7 @@ python3 sdae.py \
     --learning_rate 0.004 \
     --num_epochs 500 \
     --model_class OlshausenAE \
-    --dataset olshausen \
+    --dataset_key olshausen \
     --olshausen_path /home/owen/workspace/sdae/data/natural/images.mat \
     --olshausen_step_size 6 \
     --noise_type mn \

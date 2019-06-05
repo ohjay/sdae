@@ -11,6 +11,6 @@ python3 sdae.py \
     --learning_rate 0.01 \
     --num_epochs 100 \
     --model_class MNISTAE \
-    --dataset mnist \
+    --dataset_key mnist \
     --noise_type n/a \
     --weight_decay 0.0000001
