@@ -44,7 +44,7 @@ def generate_samples(model_class,
         samples = []
         for original_idx in range(num_originals):
             img, _ = next(iter(data_loader))
-            img = img.view(img.size(0), -1).cuda()
+            img = img.float().view(img.size(0), -1).cuda()
             z = model.encode(img)  # top-layer representation
             sample_variations = [img]  # leftmost entry is the original image
             for variation_idx in range(num_variations):

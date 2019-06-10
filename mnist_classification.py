@@ -1,4 +1,5 @@
 import torch
+import modules
 import argparse
 from utils import init_model, init_loss, init_data_loader
 
@@ -13,10 +14,7 @@ def init_sae_classifier(sae_model_class,
     sae.num_trained_blocks = sae.num_blocks
 
     # obtain output dimensionality of final encoder
-    enc_out_features = None
-    for module in sae.encoders[-1]:
-        if hasattr(module, 'out_features'):
-            enc_out_features = module.out_features
+    enc_out_features = sae.get_enc_out_features(-1)
 
     # classifier
     classifier = init_model(classifier_model_class,
@@ -71,6 +69,8 @@ def mnist_train(batch_size=128,
             # =============== forward ===============
             if sae is not None:
                 z = sae.encode(img)
+                if isinstance(sae, modules.VAE):
+                    z = z[0]  # z consists of a mean and a log_var
                 output = classifier(z)
             else:
                 output = classifier(img)
@@ -126,6 +126,8 @@ def mnist_eval(batch_size=128,
             # =============== forward ===============
             if sae is not None:
                 z = sae.encode(img)
+                if isinstance(sae, modules.VAE):
+                    z = z[0]  # z consists of a mean and a log_var
                 output = classifier(z)
             else:
                 output = classifier(img)

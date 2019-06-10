@@ -30,6 +30,15 @@ class SAE(nn.Module):
         return list(self.encoders[ae_idx].parameters()) + \
                list(self.decoders[self.num_blocks-ae_idx-1].parameters())
 
+    def get_enc_out_features(self, ae_idx):
+        """Get the output dimensionality of the "AE_IDX"-th encoder.
+        To get the output dimensionality of the final encoder, pass -1 as AE_IDX."""
+        enc_out_features = None
+        for module in self.encoders[ae_idx]:
+            if hasattr(module, 'out_features'):
+                enc_out_features = module.out_features
+        return enc_out_features
+
     def encode(self, x, ae_idx=None):
         """Encode the input. If AE_IDX is provided,
         encode with that particular encoder only."""
@@ -125,6 +134,43 @@ class MNISTSAE2(SAE):
         self.num_blocks = len(self.encoders)
 
 
+class OlshausenSAE3(SAE):
+    """Olshausen stacked autoencoder (three blocks)."""
+
+    def __init__(self):
+        super(OlshausenSAE3, self).__init__()
+
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=12*12, out_features=500),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=500, out_features=750),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=750, out_features=1000),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=1000, out_features=750),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=750, out_features=500),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=500, out_features=12*12),
+            ),
+        ])
+        self.num_trained_blocks = 0
+        self.num_blocks = len(self.encoders)
+
+
 class MNISTDenseClassifier2(nn.Module):
     """MNIST classifier (two dense blocks)."""
 
@@ -153,6 +199,8 @@ class VAE(nn.Module):
         self.log_var_estimator = nn.Sequential()
         self.decoder = nn.Sequential()
 
+        self.num_blocks = 1  # currently only one encoder/decoder pair
+
     def forward(self, x):
         mean, log_var = self.encode(x)
 
@@ -166,6 +214,13 @@ class VAE(nn.Module):
         z = mean + stdev * epsilon  # sampled latent vector
 
         return self.decode(z), mean, log_var
+
+    def get_enc_out_features(self, ae_idx):
+        enc_out_features = None
+        for module in self.mean_estimator:
+            if hasattr(module, 'out_features'):
+                enc_out_features = module.out_features
+        return enc_out_features
 
     def encode(self, x):
         x = self.encoder(x)
