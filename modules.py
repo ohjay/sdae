@@ -245,6 +245,7 @@ class VAELoss(nn.Module):
             reconstruction_loss = F.binary_cross_entropy(input_, target, reduction=self.reduction)
 
         # regularization
+        # https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence#Multivariate_normal_distributions
         kl_div = 0.5 * torch.sum(mean * mean + torch.exp(log_var) - log_var - 1, dim=1)
         kl_div = torch.mean(kl_div) if self.reduction == 'mean' else torch.sum(kl_div)
 
