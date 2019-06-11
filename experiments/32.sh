@@ -7,7 +7,7 @@
 
 python3 sdae.py \
     --batch_size 128 \
-    --learning_rate 0.01 \
+    --learning_rate 0.005 \
     --num_epochs 50 \
     --model_class MNISTCAE2 \
     --dataset_key mnist \
