@@ -1,5 +1,7 @@
 import torch
+import modules
 import argparse
+import numpy as np
 import matplotlib.pyplot as plt
 from utils import init_model, init_data_loader
 
@@ -21,18 +23,12 @@ def plot_samples(samples, fig_save_path=None):
     plt.show()
 
 
-def generate_samples(model_class,
-                     dataset_key,
-                     restore_path,
-                     olshausen_path=None,
-                     olshausen_step_size=1,
-                     num_originals=1,
-                     num_variations=5,
-                     fig_save_path=None):
-
-    model = init_model(model_class, restore_path, restore_required=True)
-    model.num_trained_blocks = model.num_blocks
-    model.eval()
+def generate_samples_ae(dataset_key,
+                        olshausen_path=None,
+                        olshausen_step_size=1,
+                        num_originals=1,
+                        num_variations=5,
+                        fig_save_path=None):
 
     # load data
     batch_size = 1
@@ -61,6 +57,32 @@ def generate_samples(model_class,
         plot_samples(samples.cpu().numpy(), fig_save_path)
 
 
+def generate_samples_vae(num,
+                         sample_h,
+                         sample_w,
+                         fig_save_path=None):
+
+    # generate samples
+    with torch.no_grad():
+        dim0_vals = np.linspace(-3, 3, num)
+        dim1_vals = np.linspace(-3, 3, num)
+        dim0_vals, dim1_vals = np.meshgrid(dim0_vals, dim1_vals)
+        latent_vecs = np.stack((dim0_vals, dim1_vals), axis=-1).reshape(-1, 2)
+
+        latent_dimensionality = model.get_enc_out_features(-1)
+        if latent_dimensionality > 2:
+            # keep values for other dimensions fixed
+            other_vals = np.random.randn(latent_dimensionality - 2)
+            other_vals = np.expand_dims(other_vals, axis=0)  # shape: (1, ld-2)
+            other_vals = np.tile(other_vals, (num * num, 1))  # shape: (n*n, ld-2)
+            latent_vecs = np.concatenate((latent_vecs, other_vals), axis=1)  # shape: (n*n, ld)
+
+        latent_vecs = torch.from_numpy(latent_vecs).float().cuda()
+        samples = model.decode(latent_vecs)  # shape: (n*n, sample_h*sample_w)
+        samples = samples.view(num, num, sample_h, sample_w)
+        plot_samples(samples.cpu().numpy(), fig_save_path)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_class', type=str, default='MNISTSAE2')
@@ -71,16 +93,27 @@ if __name__ == '__main__':
     parser.add_argument('--num_originals', type=int, default=1)
     parser.add_argument('--num_variations', type=int, default=5)
     parser.add_argument('--fig_save_path', type=str, default=None)
+    parser.add_argument('--num', type=int, default=10)
+    parser.add_argument('--sample_h', type=int, default=28)
+    parser.add_argument('--sample_w', type=int, default=28)
 
     args = parser.parse_args()
     print(args)
     print('----------')
 
-    generate_samples(args.model_class,
-                     args.dataset_key,
-                     args.restore_path,
-                     args.olshausen_path,
-                     args.olshausen_step_size,
-                     args.num_originals,
-                     args.num_variations,
-                     args.fig_save_path)
+    model = init_model(args.model_class, args.restore_path, restore_required=True)
+    model.num_trained_blocks = model.num_blocks
+    model.eval()
+
+    if isinstance(model, modules.SVAE):
+        generate_samples_vae(args.num,
+                             args.sample_h,
+                             args.sample_w,
+                             args.fig_save_path)
+    else:
+        generate_samples_ae(args.dataset_key,
+                            args.olshausen_path,
+                            args.olshausen_step_size,
+                            args.num_originals,
+                            args.num_variations,
+                            args.fig_save_path)
