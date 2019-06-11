@@ -13,12 +13,15 @@ class SAE(nn.Module):
         self.decoders = nn.ModuleList([])
 
         self.num_trained_blocks = 0
-        self.num_blocks = len(self.encoders)
 
     def forward(self, x, ae_idx=None):
         x = self.encode(x, ae_idx)
         x = self.decode(x, ae_idx)
         return x
+
+    @property
+    def num_blocks(self):
+        return len(self.encoders)
 
     def get_first_layer_weights(self, as_tensor=False):
         if as_tensor:
@@ -79,7 +82,6 @@ class OlshausenAE(SAE):
             ),
         ])
         self.num_trained_blocks = 0
-        self.num_blocks = len(self.encoders)
 
 
 class MNISTAE(SAE):
@@ -101,7 +103,6 @@ class MNISTAE(SAE):
             ),
         ])
         self.num_trained_blocks = 0
-        self.num_blocks = len(self.encoders)
 
 
 class MNISTSAE2(SAE):
@@ -131,7 +132,6 @@ class MNISTSAE2(SAE):
             ),
         ])
         self.num_trained_blocks = 0
-        self.num_blocks = len(self.encoders)
 
 
 class OlshausenSAE3(SAE):
@@ -168,7 +168,6 @@ class OlshausenSAE3(SAE):
             ),
         ])
         self.num_trained_blocks = 0
-        self.num_blocks = len(self.encoders)
 
 
 class MNISTDenseClassifier2(nn.Module):
@@ -194,16 +193,56 @@ class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
 
-        self.encoder = nn.Sequential()
-        self.mean_estimator = nn.Sequential()
-        self.log_var_estimator = nn.Sequential()
-        self.decoder = nn.Sequential()
+        self.encoders = nn.ModuleList([])
+        self.mean_estimators = nn.ModuleList([])
+        self.log_var_estimators = nn.ModuleList([])
+        self.decoders = nn.ModuleList([])
 
-        self.num_blocks = 1  # currently only one encoder/decoder pair
+        self.num_trained_blocks = 0
 
-    def forward(self, x):
-        mean, log_var = self.encode(x)
+    def forward(self, x, ae_idx=None):
+        z, mean, log_var = self.encode(x, ae_idx)
+        return self.decode(z, ae_idx), mean, log_var
 
+    @property
+    def num_blocks(self):
+        return len(self.encoders)
+
+    def get_first_layer_weights(self, as_tensor=False):
+        if as_tensor:
+            return self.encoders[0][0].weight.data.cpu()
+        return self.encoders[0][0].weight.data.cpu().numpy()
+
+    def get_block_parameters(self, ae_idx):
+        return list(self.encoders[ae_idx].parameters()) + \
+               list(self.decoders[self.num_blocks-ae_idx-1].parameters())
+
+    def get_enc_out_features(self, ae_idx):
+        enc_out_features = None
+        for module in self.mean_estimators[ae_idx]:
+            if hasattr(module, 'out_features'):
+                enc_out_features = module.out_features
+        return enc_out_features
+
+    def encode(self, x, ae_idx=None):
+        mean = x
+        log_var = x
+        if ae_idx is None:
+            for i in range(self.num_trained_blocks):
+                x = self.encoders[i](x)
+                mean = self.mean_estimators[i](x)
+                log_var = self.log_var_estimators[i](x)
+                x = self.sample_latent_vector(mean, log_var)
+        else:
+            x = self.encoders[ae_idx](x)
+            mean = self.mean_estimators[ae_idx](x)
+            log_var = self.log_var_estimators[ae_idx](x)
+            x = self.sample_latent_vector(mean, log_var)
+        return x, mean, log_var
+
+    @staticmethod
+    def sample_latent_vector(mean, log_var):
+        # ------------------------
         # reparameterization trick
         # ------------------------
         # MEAN and LOG_VAR are "mu" and log("sigma" ^2) using
@@ -211,23 +250,16 @@ class VAE(nn.Module):
         # -----------------------------------------------------------
         stdev = torch.exp(0.5 * log_var)
         epsilon = torch.randn_like(stdev)
-        z = mean + stdev * epsilon  # sampled latent vector
+        return mean + stdev * epsilon  # sampled latent vector
 
-        return self.decode(z), mean, log_var
-
-    def get_enc_out_features(self, ae_idx):
-        enc_out_features = None
-        for module in self.mean_estimator:
-            if hasattr(module, 'out_features'):
-                enc_out_features = module.out_features
-        return enc_out_features
-
-    def encode(self, x):
-        x = self.encoder(x)
-        return self.mean_estimator(x), self.log_var_estimator(x)
-
-    def decode(self, z):
-        return self.decoder(z)
+    def decode(self, x, ae_idx=None):
+        if ae_idx is None:
+            start = self.num_blocks - self.num_trained_blocks
+            for i in range(start, self.num_blocks):
+                x = self.decoders[i](x)
+        else:
+            x = self.decoders[self.num_blocks-ae_idx-1](x)
+        return x
 
 
 class VAELoss(nn.Module):
@@ -258,19 +290,77 @@ class MNISTVAE(VAE):
     def __init__(self):
         super(MNISTVAE, self).__init__()
 
-        self.encoder = nn.Sequential(
-            nn.Linear(in_features=28*28, out_features=400),
-            nn.ReLU(),
-        )
-        self.mean_estimator = nn.Sequential(
-            nn.Linear(in_features=400, out_features=20),
-        )
-        self.log_var_estimator = nn.Sequential(
-            nn.Linear(in_features=400, out_features=20),
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(in_features=20, out_features=400),
-            nn.ReLU(),
-            nn.Linear(in_features=400, out_features=28*28),
-            nn.Sigmoid(),
-        )
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=28*28, out_features=400),
+                nn.ReLU(),
+            ),
+        ])
+        self.mean_estimators = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=400, out_features=20),
+            ),
+        ])
+        self.log_var_estimators = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=400, out_features=20),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=20, out_features=400),
+                nn.ReLU(),
+                nn.Linear(in_features=400, out_features=28*28),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.num_trained_blocks = 0
+
+
+class MNISTSVAE(VAE):
+    """MNIST stacked variational autoencoder."""
+
+    def __init__(self):
+        super(MNISTSVAE, self).__init__()
+
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=28*28, out_features=500),
+                nn.ReLU(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=500, out_features=1000),
+                nn.ReLU(),
+            ),
+        ])
+        self.mean_estimators = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=500, out_features=500),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=1000, out_features=1000),
+            ),
+        ])
+        self.log_var_estimators = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=500, out_features=500),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=1000, out_features=1000),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=1000, out_features=1000),
+                nn.ReLU(),
+                nn.Linear(in_features=1000, out_features=500),
+                nn.ReLU(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=500, out_features=500),
+                nn.ReLU(),
+                nn.Linear(in_features=500, out_features=28*28),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.num_trained_blocks = 0

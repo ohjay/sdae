@@ -5,15 +5,16 @@ Code originally based on https://github.com/L1aoXingyu/pytorch-beginner/tree/mas
 
 import os
 import torch
+import modules
 import argparse
 from utils import to_img, zero_mask, add_gaussian, salt_and_pepper, \
     plot_first_layer_weights, save_image_wrapper, init_model, init_loss, init_data_loader
 
 
-def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='OlshausenAE',
-               dataset_key='olshausen', noise_type='gs', zero_frac=0.3, gaussian_stdev=0.4, sp_frac=0.1,
-               restore_path=None, save_path='./stage1_sae.pth', log_freq=10, olshausen_path=None,
-               olshausen_step_size=1, weight_decay=0, loss_type='mse', emph_wt_a=1, emph_wt_b=1):
+def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
+               noise_type, zero_frac, gaussian_stdev, sp_frac, restore_path, save_path,
+               log_freq, olshausen_path, olshausen_step_size, weight_decay, loss_type,
+               emph_wt_a, emph_wt_b, vae_reconstruction_loss_type):
     # set up log folders
     if not os.path.exists('./01_original'):
         os.makedirs('./01_original')
@@ -26,7 +27,10 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='
 
     # set up model and criterion
     model = init_model(model_class, restore_path, restore_required=False)
-    criterion = init_loss(loss_type)
+    if isinstance(model, modules.VAE):
+        criterion = init_loss('vae', reconstruction_loss_type=vae_reconstruction_loss_type)
+    else:
+        criterion = init_loss(loss_type)
 
     # load data
     data_loader, _, _, data_minval, data_maxval = init_data_loader(
@@ -46,13 +50,15 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='
             model.get_block_parameters(ae_idx), lr=learning_rate, weight_decay=weight_decay)
 
         for epoch in range(num_epochs):
-            mean_loss = 0
+            mean_loss, total_num_examples = 0, 0
             for batch_idx, data in enumerate(data_loader):
                 original, _ = data
                 original = original.float()
                 original = original.view(original.size(0), -1)
                 original = original.cuda()
                 original = model.encode(original)
+                if isinstance(model, modules.VAE):
+                    original = original[1]  # (sampled latent vector, mean, log_var)
                 original = original.detach()
 
                 # apply noise
@@ -71,14 +77,22 @@ def train_sdae(batch_size=128, learning_rate=1e-2, num_epochs=100, model_class='
                 noisy = noisy.detach().cuda()
 
                 # =============== forward ===============
-                output = model(noisy, ae_idx)
-                if (emph_wt_a != 1 or emph_wt_b != 1) and noise_type != 'gs':
-                    # emphasize corrupted dimensions in the loss
-                    loss = emph_wt_a * criterion(output[affected], original[affected]) + \
-                           emph_wt_b * criterion(output[1 - affected], original[1 - affected])
+                if isinstance(model, modules.VAE):
+                    output, mean, log_var = model(noisy, ae_idx)
+                    loss = criterion(output, original, mean, log_var)
+                    batch_size_ = original.size(0)  # might be undersized last batch
+                    total_num_examples += batch_size_
+                    # assumes `loss` is sum for batch
+                    mean_loss += (loss - mean_loss * batch_size_) / total_num_examples
                 else:
-                    loss = criterion(output, original)
-                mean_loss += (loss - mean_loss) / (batch_idx + 1)  # assumes `loss` is mean for batch
+                    output = model(noisy, ae_idx)
+                    if (emph_wt_a != 1 or emph_wt_b != 1) and noise_type != 'gs':
+                        # emphasize corrupted dimensions in the loss
+                        loss = emph_wt_a * criterion(output[affected], original[affected]) + \
+                               emph_wt_b * criterion(output[1 - affected], original[1 - affected])
+                    else:
+                        loss = criterion(output, original)
+                    mean_loss += (loss - mean_loss) / (batch_idx + 1)  # assumes `loss` is mean for batch
 
                 # =============== backward ==============
                 optimizer.zero_grad()
@@ -125,12 +139,14 @@ if __name__ == '__main__':
     parser.add_argument('--loss_type', type=str, default='mse')
     parser.add_argument('--emph_wt_a', type=float, default=1)
     parser.add_argument('--emph_wt_b', type=float, default=1)
+    parser.add_argument('--vae_reconstruction_loss_type', type=str, default='mse')
 
     args = parser.parse_args()
     print(args)
     print('----------')
 
     train_sdae(
-        args.batch_size, args.learning_rate, args.num_epochs, args.model_class, args.dataset_key, args.noise_type,
-        args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path, args.save_path, args.log_freq,
-        args.olshausen_path, args.olshausen_step_size, args.weight_decay, args.loss_type, args.emph_wt_a, args.emph_wt_b)
+        args.batch_size, args.learning_rate, args.num_epochs, args.model_class, args.dataset_key,
+        args.noise_type, args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path,
+        args.save_path, args.log_freq, args.olshausen_path, args.olshausen_step_size, args.weight_decay,
+        args.loss_type, args.emph_wt_a, args.emph_wt_b, args.vae_reconstruction_loss_type)
