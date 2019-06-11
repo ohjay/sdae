@@ -4,118 +4,42 @@ import argparse
 from utils import init_model, init_loss, init_data_loader
 
 
-def init_sae_classifier(sae_model_class,
-                        sae_restore_path,
-                        classifier_model_class,
-                        classifier_restore_path):
-
-    # stacked autoencoder
-    sae = init_model(sae_model_class, sae_restore_path, False)
-    sae.num_trained_blocks = sae.num_blocks
-
-    # obtain output dimensionality of final encoder
-    enc_out_features = sae.get_enc_out_features(-1)
-
-    # classifier
-    classifier = init_model(classifier_model_class,
-                            classifier_restore_path,
-                            restore_required=False,
-                            enc_out_features=enc_out_features)
-
-    return sae, classifier
-
-
-def mnist_train(batch_size=128,
-                learning_rate=1e-2,
-                num_epochs=100,
-                sae_model_class='MNISTSAE2',
-                sae_restore_path='./stage1_sae.pth',
-                sae_save_path='./stage2_sae.pth',
-                classifier_model_class='MNISTDenseClassifier2',
-                classifier_restore_path=None,
-                classifier_save_path='./stage2_classifier.pth',
-                log_freq=10,
-                weight_decay=0,
-                loss_type='nll',
-                no_sae=False,
-                mnist_variant='mnist'):
-
-    if no_sae:
-        sae = None
-        classifier = init_model(
-            classifier_model_class, classifier_restore_path, False, enc_out_features=28*28)
-        parameters = classifier.parameters()
-    else:
-        sae, classifier = init_sae_classifier(
-            sae_model_class, sae_restore_path, classifier_model_class, classifier_restore_path)
-        parameters = list(sae.parameters()) + list(classifier.parameters())
+def mnist_train(data_loader, criterion):
+    """Trains the model using one pass through the training set."""
+    if sae is not None:
         sae.train()
     classifier.train()
 
-    # loss and optimization
-    criterion = init_loss(loss_type)
-    optimizer = torch.optim.Adam(parameters, lr=learning_rate, weight_decay=weight_decay)
+    mean_loss = 0
+    for batch_idx, (img, label) in enumerate(data_loader):
+        img = img.view(img.size(0), -1)
+        img, label = img.cuda(), label.cuda()
 
-    # load data
-    data_loader, _, _, _, _ = init_data_loader(mnist_variant, True, batch_size)
+        # =============== forward ===============
+        if sae is not None:
+            z = sae.encode(img)
+            if isinstance(sae, modules.SVAE):
+                z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
+            output = classifier(z)
+        else:
+            output = classifier(img)
+        loss = criterion(output, label)
+        mean_loss += (loss - mean_loss) / (batch_idx + 1)
 
-    # training loop
-    for epoch in range(num_epochs):
-        mean_loss = 0
-        for batch_idx, (img, label) in enumerate(data_loader):
-            img = img.view(img.size(0), -1)
-            img, label = img.cuda(), label.cuda()
+        # =============== backward ==============
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-            # =============== forward ===============
-            if sae is not None:
-                z = sae.encode(img)
-                if isinstance(sae, modules.SVAE):
-                    z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
-                output = classifier(z)
-            else:
-                output = classifier(img)
-            loss = criterion(output, label)
-            mean_loss += (loss - mean_loss) / (batch_idx + 1)
-
-            # =============== backward ==============
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        # =================== log ===================
-        print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, mean_loss.item()))
-        if epoch % log_freq == 0 or epoch == num_epochs - 1:
-            if sae is not None:
-                torch.save(sae.state_dict(), sae_save_path)
-                print('[o] saved SAE to %s' % sae_save_path)
-            torch.save(classifier.state_dict(), classifier_save_path)
-            print('[o] saved classifier to %s' % classifier_save_path)
+    # =================== log ===================
+    print('[train] epoch {}/{}, loss={:.6f}'.format(epoch + 1, args.num_epochs, mean_loss.item()))
 
 
-def mnist_eval(batch_size=128,
-               sae_model_class='MNISTSAE2',
-               sae_restore_path='./stage2_sae.pth',
-               classifier_model_class='MNISTDenseClassifier2',
-               classifier_restore_path='./stage2_classifier.pth',
-               loss_type='nll',
-               no_sae=False,
-               mnist_variant='mnist'):
-
-    if no_sae:
-        sae = None
-        classifier = init_model(
-            classifier_model_class, classifier_restore_path, False, enc_out_features=28*28)
-    else:
-        sae, classifier = init_sae_classifier(
-            sae_model_class, sae_restore_path, classifier_model_class, classifier_restore_path)
+def mnist_eval(data_loader, criterion):
+    """Evaluates the model on the entire validation/test set."""
+    if sae is not None:
         sae.eval()
     classifier.eval()
-
-    # loss
-    criterion = init_loss(loss_type, reduction='sum')
-
-    # load data
-    data_loader, _, _, _, _ = init_data_loader(mnist_variant, False, batch_size)
 
     total_loss, num_correct = 0, 0
     with torch.no_grad():
@@ -137,7 +61,7 @@ def mnist_eval(batch_size=128,
 
     dataset_size = len(data_loader.dataset)
     mean_loss = total_loss / dataset_size
-    print('\n[test] mean loss: {:.6f}, acc {:.6f}'.format(mean_loss, num_correct / dataset_size))
+    print('[eval] mean loss: {:.6f}, acc {:.6f}'.format(mean_loss, num_correct / dataset_size))
 
 
 if __name__ == '__main__':
@@ -162,37 +86,45 @@ if __name__ == '__main__':
     print(args)
     print('----------')
 
-    if not args.no_train:
-        print('\n'
-              '=========\n'
-              '= TRAIN =\n'
-              '=========\n')
-        mnist_train(args.batch_size,
-                    args.learning_rate,
-                    args.num_epochs,
-                    args.sae_model_class,
-                    args.sae_restore_path,
-                    args.sae_save_path,
-                    args.classifier_model_class,
-                    args.classifier_restore_path,
-                    args.classifier_save_path,
-                    args.log_freq,
-                    args.weight_decay,
-                    args.loss_type,
-                    args.no_sae,
-                    args.mnist_variant)
-        args.sae_restore_path = args.sae_save_path
-        args.classifier_restore_path = args.classifier_save_path
+    # SAE
+    if args.no_sae:
+        sae = None
+        sae_parameters = []
+        enc_out_features = 28 * 28
+    else:
+        # stacked autoencoder
+        sae = init_model(args.sae_model_class, args.sae_restore_path, False)
+        sae.num_trained_blocks = sae.num_blocks
+        sae_parameters = list(sae.parameters())
+        # obtain output dimensionality of final encoder
+        enc_out_features = sae.get_enc_out_features(-1)
 
-    print('\n'
-          '========\n'
-          '= EVAL =\n'
-          '========\n')
-    mnist_eval(args.batch_size,
-               args.sae_model_class,
-               args.sae_restore_path,
-               args.classifier_model_class,
-               args.classifier_restore_path,
-               args.loss_type,
-               args.no_sae,
-               args.mnist_variant)
+    # classifier
+    classifier = init_model(args.classifier_model_class,
+                            args.classifier_restore_path,
+                            restore_required=False,
+                            enc_out_features=enc_out_features)
+    parameters = sae_parameters + list(classifier.parameters())
+
+    # loss and optimization
+    criterion_train = init_loss(args.loss_type)
+    criterion_eval = init_loss(args.loss_type, reduction='sum')
+    optimizer = torch.optim.Adam(parameters, lr=args.learning_rate, weight_decay=args.weight_decay)
+
+    # load data
+    data_loader_train, _, _, _, _ = init_data_loader(args.mnist_variant, True, args.batch_size)
+    data_loader_eval, _, _, _, _ = init_data_loader(args.mnist_variant, False, args.batch_size)
+
+    if args.no_train:
+        mnist_eval(data_loader_eval, criterion_eval)
+    else:
+        # training loop
+        for epoch in range(args.num_epochs):
+            mnist_train(data_loader_train, criterion_train)
+            if epoch % args.log_freq == 0 or epoch == args.num_epochs - 1:
+                if sae is not None:
+                    torch.save(sae.state_dict(), args.sae_save_path)
+                    print('[o] saved SAE to %s' % args.sae_save_path)
+                torch.save(classifier.state_dict(), args.classifier_save_path)
+                print('[o] saved classifier to %s' % args.classifier_save_path)
+                mnist_eval(data_loader_eval, criterion_eval)
