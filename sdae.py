@@ -54,7 +54,8 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
             for batch_idx, data in enumerate(data_loader):
                 original, _ = data
                 original = original.float()
-                original = original.view(original.size(0), -1)
+                if not model.is_convolutional:
+                    original = original.view(original.size(0), -1)
                 original = original.cuda()
                 original = model.encode(original)
                 if isinstance(model, modules.SVAE):

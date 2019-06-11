@@ -40,7 +40,9 @@ def generate_samples_ae(dataset_key,
         samples = []
         for original_idx in range(num_originals):
             img, _ = next(iter(data_loader))
-            img = img.float().view(img.size(0), -1).cuda()
+            img = img.float().cuda()
+            if not model.is_convolutional:
+                img = img.view(img.size(0), -1)
             z = model.encode(img)  # top-layer representation
             sample_variations = [img]  # leftmost entry is the original image
             for variation_idx in range(num_variations):
@@ -64,6 +66,7 @@ def generate_samples_vae(num,
 
     # generate samples
     with torch.no_grad():
+        # vary first two dims over grid
         dim0_vals = np.linspace(-3, 3, num)
         dim1_vals = np.linspace(-3, 3, num)
         dim0_vals, dim1_vals = np.meshgrid(dim0_vals, dim1_vals)

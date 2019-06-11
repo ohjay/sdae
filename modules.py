@@ -3,6 +3,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class Flatten(nn.Module):
+    """Source: https://bit.ly/2I8PJyH."""
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+
+# ====================
+# REGULAR AUTOENCODERS
+# ====================
+
+
 class SAE(nn.Module):
     """Stacked autoencoder."""
 
@@ -13,6 +24,7 @@ class SAE(nn.Module):
         self.decoders = nn.ModuleList([])
 
         self.num_trained_blocks = 0
+        self.is_convolutional = False
 
     def forward(self, x, ae_idx=None):
         x = self.encode(x, ae_idx)
@@ -166,7 +178,57 @@ class OlshausenSAE3(SAE):
         ])
 
 
-class MNISTDenseClassifier2(nn.Module):
+class MNISTCAE(SAE):
+    """MNIST convolutional autoencoder."""
+
+    def __init__(self):
+        super(MNISTCAE, self).__init__()
+
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=3, padding=1),
+                nn.ReLU(),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.Conv2d(in_channels=16, out_channels=8, kernel_size=3, stride=2, padding=1),
+                nn.Sigmoid(),
+                nn.MaxPool2d(kernel_size=2, stride=1),  # shape: (batch, 8, 2, 2)
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.ConvTranspose2d(in_channels=8, out_channels=16, kernel_size=3, stride=2),
+                nn.ReLU(),
+                nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=5, stride=3, padding=1),
+                nn.ReLU(),
+                nn.ConvTranspose2d(in_channels=8, out_channels=1, kernel_size=2, stride=2, padding=1),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.is_convolutional = True
+
+    def get_enc_out_features(self, ae_idx):
+        _enc_out_features = [8 * 2 * 2]
+        return _enc_out_features[ae_idx]
+
+
+# ===========
+# CLASSIFIERS
+# ===========
+
+
+class Classifier(nn.Module):
+    """Classifier."""
+
+    def __init__(self):
+        super(Classifier, self).__init__()
+        self.classifier = nn.Sequential()
+        self.is_convolutional = False
+
+    def forward(self, x):
+        return self.classifier(x)
+
+
+class MNISTDenseClassifier2(Classifier):
     """MNIST classifier (two dense blocks)."""
 
     def __init__(self, enc_out_features):
@@ -179,8 +241,10 @@ class MNISTDenseClassifier2(nn.Module):
             nn.LogSoftmax(dim=1),
         )
 
-    def forward(self, x):
-        return self.classifier(x)
+
+# ========================
+# VARIATIONAL AUTOENCODERS
+# ========================
 
 
 class SVAE(SAE):

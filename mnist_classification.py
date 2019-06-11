@@ -12,7 +12,8 @@ def mnist_train(data_loader, criterion):
 
     mean_loss = 0
     for batch_idx, (img, label) in enumerate(data_loader):
-        img = img.view(img.size(0), -1)
+        if sae is not None and not sae.is_convolutional:
+            img = img.view(img.size(0), -1)
         img, label = img.cuda(), label.cuda()
 
         # =============== forward ===============
@@ -20,6 +21,8 @@ def mnist_train(data_loader, criterion):
             z = sae.encode(img)
             if isinstance(sae, modules.SVAE):
                 z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
+            if sae.is_convolutional and not classifier.is_convolutional:
+                z = z.view(z.size(0), -1)
             output = classifier(z)
         else:
             output = classifier(img)
@@ -44,7 +47,8 @@ def mnist_eval(data_loader, criterion):
     total_loss, num_correct = 0, 0
     with torch.no_grad():
         for img, label in data_loader:
-            img = img.view(img.size(0), -1)
+            if sae is not None and not sae.is_convolutional:
+                img = img.view(img.size(0), -1)
             img, label = img.cuda(), label.cuda()
 
             # =============== forward ===============
@@ -52,6 +56,8 @@ def mnist_eval(data_loader, criterion):
                 z = sae.encode(img)
                 if isinstance(sae, modules.SVAE):
                     z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
+                if sae.is_convolutional and not classifier.is_convolutional:
+                    z = z.view(z.size(0), -1)  # flatten
                 output = classifier(z)
             else:
                 output = classifier(img)

@@ -53,19 +53,32 @@ def plot_first_layer_weights(model, weight_h=None, weight_w=None, block_on_viz=F
     weights = model.get_first_layer_weights()
     print('shape of first-layer weights: %r' % (weights.shape,))
 
+    if len(weights.shape) == 4:
+        # weights for convolutional layer
+        n, c, h, w = weights.shape
+        weights = np.reshape(weights, (n * c, h, w))
+
     if not block_on_viz:
         plt.ion()
         plt.show()
 
-    fig, ax = plt.subplots(nrows=5, ncols=10)
+    n = weights.shape[0]
+    if n < 50:
+        nrows = int(np.sqrt(n))
+        ncols = int(np.ceil(n // nrows))
+    else:
+        nrows, ncols = 5, 10
+    fig, ax = plt.subplots(nrows, ncols)
     i = 0
     for row in ax:
         for col in row:
-            weight = weights[i, :]
-            if not weight_h or not weight_w:
-                # Infer height and width of weight, assuming it is square
-                weight_h = weight_w = int(np.sqrt(weight.size))
-            col.imshow(np.reshape(weights[i, :], (weight_h, weight_w)), cmap='gray')
+            weight = weights[i]
+            if len(weight.shape) == 1:
+                if not weight_h or not weight_w:
+                    # infer height and width of weight, assuming it is square
+                    weight_h = weight_w = int(np.sqrt(weight.size))
+                weight = np.reshape(weight, (weight_h, weight_w))
+            col.imshow(weight, cmap='gray')
             col.axis('off')
             i += 1
 
