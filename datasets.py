@@ -1,5 +1,8 @@
 import os
+import h5py
 import torch
+import pickle
+import imageio
 import numpy as np
 import scipy.io as sio
 from torch.utils import data
@@ -152,3 +155,101 @@ class MNISTVariant(MNIST):
     @property
     def processed_folder(self):
         return os.path.join(self.root, 'MNIST', 'processed')
+
+
+class CUB2011Dataset(data.Dataset):
+    """Caltech-UCSD Birds-200-2011.
+    Available here: http://www.vision.caltech.edu/visipedia/CUB-200-2011.html.
+    """
+    training_file = 'train.h5'
+    eval_file = 'eval.h5'
+
+    def __init__(self, cub_folder, train=True, normalize=False):
+        """CUB_FOLDER should contain the following items (among other things):
+        images/, images.txt, train_test_split.txt, classes.txt, image_class_labels.txt."""
+        super(CUB2011Dataset, self).__init__()
+        self.cub_folder = cub_folder
+        self.train = train  # training set or test set
+
+        self.classes_path = os.path.join(self.cub_folder, 'classes.pkl')
+        if not os.path.exists(self.classes_path):
+            self.process_classes()
+        with open(self.classes_path, 'rb') as f:
+            self.classes = pickle.load(f)
+
+        if self.train:
+            data_path = os.path.join(self.cub_folder, self.training_file)
+        else:
+            data_path = os.path.join(self.cub_folder, self.eval_file)
+
+        if not os.path.exists(data_path):
+            self.process_images_and_labels()
+
+        h5f = h5py.File(data_path, 'r')
+        self.images = h5f['images'][:]  # shape: (n, h, w, 3)
+        self.labels = h5f['labels'][:]  # shape: (n,)
+        h5f.close()
+
+        if normalize:
+            # normalize to range [0, 1]
+            _min = self.images.min()
+            self.images = (self.images - _min) / (self.images.max() - _min)
+
+    def __len__(self):
+        return self.images.shape[0]
+
+    def __getitem__(self, index):
+        return self.images[index], self.labels[index]  # (image, label)
+
+    def process_classes(self):
+        classes = {}
+        with open(os.path.join(self.cub_folder, 'classes.txt')) as f:
+            for line in f:
+                class_id, class_name = line.strip().split()
+                classes[class_id - 1] = class_name
+        with open(self.classes_path, 'wb') as f:
+            pickle.dump(classes, f, pickle.HIGHEST_PROTOCOL)
+
+    def process_images_and_labels(self):
+        train_test_split = {}
+        with open(os.path.join(self.cub_folder, 'train_test_split.txt')) as f:
+            for line in f:
+                image_id, is_training_image = line.strip().split()
+                train_test_split[image_id - 1] = bool(is_training_image)
+
+        image_class_labels = {}
+        with open(os.path.join(self.cub_folder, 'image_class_labels.txt')) as f:
+            for line in f:
+                image_id, class_id = line.strip().split()
+                image_class_labels[image_id - 1] = class_id - 1
+
+        train_images, train_labels = [], []
+        eval_images, eval_labels = [], []
+        with open(os.path.join(self.cub_folder, 'images.txt')) as f:
+            for line in f:
+                image_id, image_name = line.strip().split()
+                image_path = os.path.join('images', image_name)
+                if train_test_split[image_id - 1]:
+                    train_images.append(imageio.imread(image_path))
+                    train_labels.append(image_class_labels[image_id - 1])
+                else:
+                    eval_images.append(imageio.imread(image_path))
+                    eval_labels.append(image_class_labels[image_id - 1])
+        train_images, train_labels = [np.array(ta) for ta in (train_images, train_labels)]
+        eval_images, eval_labels = [np.array(ea) for ea in (eval_images, eval_labels)]
+
+        train_eval_triplets = [
+            (os.path.join(self.cub_folder, self.training_file), train_images, train_labels),
+            (os.path.join(self.cub_folder, self.eval_file), eval_images, eval_labels)
+        ]
+        for data_path, images, labels in train_eval_triplets:
+            h5f = h5py.File(data_path, 'w')
+            h5f.create_dataset('images', data=images)
+            h5f.create_dataset('labels', data=labels)
+            h5f.close()
+
+    def get_minval(self):
+        return self.images.min()
+
+    def get_maxval(self):
+        return self.images.max()

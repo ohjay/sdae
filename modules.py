@@ -298,35 +298,37 @@ class MNISTSVAE(SVAE):
                 nn.ReLU(),
             ),
             nn.Sequential(
-                nn.Linear(in_features=500, out_features=1000),
+                nn.Linear(in_features=50, out_features=25),
                 nn.ReLU(),
             ),
         ])
         self.mean_estimators = nn.ModuleList([
             nn.Sequential(
-                nn.Linear(in_features=500, out_features=500),
+                nn.Linear(in_features=500, out_features=50),
+                nn.Sigmoid(),
             ),
             nn.Sequential(
-                nn.Linear(in_features=1000, out_features=1000),
+                nn.Linear(in_features=25, out_features=10),
             ),
         ])
         self.log_var_estimators = nn.ModuleList([
             nn.Sequential(
-                nn.Linear(in_features=500, out_features=500),
+                nn.Linear(in_features=500, out_features=50),
+                nn.Sigmoid(),
             ),
             nn.Sequential(
-                nn.Linear(in_features=1000, out_features=1000),
+                nn.Linear(in_features=25, out_features=10),
             ),
         ])
         self.decoders = nn.ModuleList([
             nn.Sequential(
-                nn.Linear(in_features=1000, out_features=1000),
+                nn.Linear(in_features=10, out_features=25),
                 nn.ReLU(),
-                nn.Linear(in_features=1000, out_features=500),
-                nn.ReLU(),
+                nn.Linear(in_features=25, out_features=50),
+                nn.Sigmoid(),
             ),
             nn.Sequential(
-                nn.Linear(in_features=500, out_features=500),
+                nn.Linear(in_features=50, out_features=500),
                 nn.ReLU(),
                 nn.Linear(in_features=500, out_features=28*28),
                 nn.Sigmoid(),

@@ -7,7 +7,7 @@
 
 python3 mnist_classification.py \
     --batch_size 128 \
-    --learning_rate 0.005 \
+    --learning_rate 0.001 \
     --num_epochs 50 \
     --sae_model_class MNISTVAE \
     --sae_restore_path ./ckpt/vae.pth \

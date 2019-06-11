@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# experiment26
+# experiment27
 # ------------
-# Train a stacked regular variational autoencoder on MNIST.
-# The trained SVAE should be saved in ./ckpt/svae.pth.
+# Train a stacked denoising variational autoencoder on MNIST.
+# The trained SDVAE should be saved in ./ckpt/sdvae.pth.
 
 python3 sdae.py \
     --batch_size 128 \
@@ -11,7 +11,8 @@ python3 sdae.py \
     --num_epochs 50 \
     --model_class MNISTSVAE \
     --dataset_key mnist \
-    --noise_type n/a \
-    --save_path ./ckpt/svae.pth \
+    --noise_type gs \
+    --gaussian_stdev 0.4 \
+    --save_path ./ckpt/sdvae.pth \
     --weight_decay 0.0000001 \
     --vae_reconstruction_loss_type bce
