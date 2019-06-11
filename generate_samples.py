@@ -64,6 +64,8 @@ def generate_samples_vae(num,
                          sample_w,
                          fig_save_path=None):
 
+    assert not model.is_convolutional
+
     # generate samples
     with torch.no_grad():
         # vary first two dims over grid

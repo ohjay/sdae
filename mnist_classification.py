@@ -4,6 +4,18 @@ import argparse
 from utils import init_model, init_loss, init_data_loader
 
 
+def forward(img):
+    if sae is not None:
+        z = sae.encode(img)
+        if isinstance(sae, modules.SVAE):
+            z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
+        if sae.is_convolutional and not classifier.is_convolutional:
+            z = z.view(z.size(0), -1)
+        return classifier(z)
+    else:
+        return classifier(img)
+
+
 def mnist_train(data_loader, criterion):
     """Trains the model using one pass through the training set."""
     if sae is not None:
@@ -17,15 +29,7 @@ def mnist_train(data_loader, criterion):
         img, label = img.cuda(), label.cuda()
 
         # =============== forward ===============
-        if sae is not None:
-            z = sae.encode(img)
-            if isinstance(sae, modules.SVAE):
-                z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
-            if sae.is_convolutional and not classifier.is_convolutional:
-                z = z.view(z.size(0), -1)
-            output = classifier(z)
-        else:
-            output = classifier(img)
+        output = forward(img)
         loss = criterion(output, label)
         mean_loss += (loss - mean_loss) / (batch_idx + 1)
 
@@ -52,15 +56,7 @@ def mnist_eval(data_loader, criterion):
             img, label = img.cuda(), label.cuda()
 
             # =============== forward ===============
-            if sae is not None:
-                z = sae.encode(img)
-                if isinstance(sae, modules.SVAE):
-                    z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
-                if sae.is_convolutional and not classifier.is_convolutional:
-                    z = z.view(z.size(0), -1)  # flatten
-                output = classifier(z)
-            else:
-                output = classifier(img)
+            output = forward(img)
             total_loss += criterion(output, label).item()
             prediction = output.argmax(dim=1, keepdim=True)
             num_correct += prediction.eq(label.view_as(prediction)).sum().item()
