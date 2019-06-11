@@ -27,7 +27,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
 
     # set up model and criterion
     model = init_model(model_class, restore_path, restore_required=False)
-    if isinstance(model, modules.VAE):
+    if isinstance(model, modules.SVAE):
         criterion = init_loss('vae', reconstruction_loss_type=vae_reconstruction_loss_type)
     else:
         criterion = init_loss(loss_type)
@@ -57,7 +57,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                 original = original.view(original.size(0), -1)
                 original = original.cuda()
                 original = model.encode(original)
-                if isinstance(model, modules.VAE):
+                if isinstance(model, modules.SVAE):
                     original = original[1]  # (sampled latent vector, mean, log_var)
                 original = original.detach()
 
@@ -77,7 +77,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                 noisy = noisy.detach().cuda()
 
                 # =============== forward ===============
-                if isinstance(model, modules.VAE):
+                if isinstance(model, modules.SVAE):
                     output, mean, log_var = model(noisy, ae_idx)
                     loss = criterion(output, original, mean, log_var)
                     batch_size_ = original.size(0)  # might be undersized last batch

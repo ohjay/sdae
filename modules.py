@@ -81,7 +81,6 @@ class OlshausenAE(SAE):
                 nn.Linear(in_features=120, out_features=12*12),
             ),
         ])
-        self.num_trained_blocks = 0
 
 
 class MNISTAE(SAE):
@@ -102,7 +101,6 @@ class MNISTAE(SAE):
                 nn.Sigmoid(),
             ),
         ])
-        self.num_trained_blocks = 0
 
 
 class MNISTSAE2(SAE):
@@ -131,7 +129,6 @@ class MNISTSAE2(SAE):
                 nn.Sigmoid(),
             ),
         ])
-        self.num_trained_blocks = 0
 
 
 class OlshausenSAE3(SAE):
@@ -167,7 +164,6 @@ class OlshausenSAE3(SAE):
                 nn.Linear(in_features=500, out_features=12*12),
             ),
         ])
-        self.num_trained_blocks = 0
 
 
 class MNISTDenseClassifier2(nn.Module):
@@ -187,35 +183,18 @@ class MNISTDenseClassifier2(nn.Module):
         return self.classifier(x)
 
 
-class VAE(nn.Module):
-    """Variational autoencoder."""
+class SVAE(SAE):
+    """Stacked variational autoencoder."""
 
     def __init__(self):
-        super(VAE, self).__init__()
+        super(SVAE, self).__init__()
 
-        self.encoders = nn.ModuleList([])
         self.mean_estimators = nn.ModuleList([])
         self.log_var_estimators = nn.ModuleList([])
-        self.decoders = nn.ModuleList([])
-
-        self.num_trained_blocks = 0
 
     def forward(self, x, ae_idx=None):
         z, mean, log_var = self.encode(x, ae_idx)
         return self.decode(z, ae_idx), mean, log_var
-
-    @property
-    def num_blocks(self):
-        return len(self.encoders)
-
-    def get_first_layer_weights(self, as_tensor=False):
-        if as_tensor:
-            return self.encoders[0][0].weight.data.cpu()
-        return self.encoders[0][0].weight.data.cpu().numpy()
-
-    def get_block_parameters(self, ae_idx):
-        return list(self.encoders[ae_idx].parameters()) + \
-               list(self.decoders[self.num_blocks-ae_idx-1].parameters())
 
     def get_enc_out_features(self, ae_idx):
         enc_out_features = None
@@ -252,15 +231,6 @@ class VAE(nn.Module):
         epsilon = torch.randn_like(stdev)
         return mean + stdev * epsilon  # sampled latent vector
 
-    def decode(self, x, ae_idx=None):
-        if ae_idx is None:
-            start = self.num_blocks - self.num_trained_blocks
-            for i in range(start, self.num_blocks):
-                x = self.decoders[i](x)
-        else:
-            x = self.decoders[self.num_blocks-ae_idx-1](x)
-        return x
-
 
 class VAELoss(nn.Module):
     def __init__(self, reduction='sum', reconstruction_loss_type='mse'):
@@ -284,7 +254,7 @@ class VAELoss(nn.Module):
         return reconstruction_loss + kl_div
 
 
-class MNISTVAE(VAE):
+class MNISTVAE(SVAE):
     """MNIST variational autoencoder."""
 
     def __init__(self):
@@ -314,10 +284,9 @@ class MNISTVAE(VAE):
                 nn.Sigmoid(),
             ),
         ])
-        self.num_trained_blocks = 0
 
 
-class MNISTSVAE(VAE):
+class MNISTSVAE(SVAE):
     """MNIST stacked variational autoencoder."""
 
     def __init__(self):
@@ -363,4 +332,3 @@ class MNISTSVAE(VAE):
                 nn.Sigmoid(),
             ),
         ])
-        self.num_trained_blocks = 0

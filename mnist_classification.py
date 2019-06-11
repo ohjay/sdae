@@ -69,7 +69,7 @@ def mnist_train(batch_size=128,
             # =============== forward ===============
             if sae is not None:
                 z = sae.encode(img)
-                if isinstance(sae, modules.VAE):
+                if isinstance(sae, modules.SVAE):
                     z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
                 output = classifier(z)
             else:
@@ -126,7 +126,7 @@ def mnist_eval(batch_size=128,
             # =============== forward ===============
             if sae is not None:
                 z = sae.encode(img)
-                if isinstance(sae, modules.VAE):
+                if isinstance(sae, modules.SVAE):
                     z = z[1]  # z consists of a sampled latent vector, a mean, and a log_var
                 output = classifier(z)
             else:
