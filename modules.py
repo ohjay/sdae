@@ -211,6 +211,49 @@ class MNISTCAE(SAE):
         return _enc_out_features[ae_idx]
 
 
+class MNISTCAE2(SAE):
+    """MNIST stacked convolutional autoencoder (two blocks)."""
+
+    def __init__(self):
+        super(MNISTCAE2, self).__init__()
+
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_channels=1, out_channels=8, kernel_size=7, stride=1, padding=3),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=8, out_channels=16, kernel_size=7, stride=1, padding=3),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 16, 14, 14)
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Conv2d(in_channels=16, out_channels=16, kernel_size=5, stride=1, padding=2),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=16, out_channels=16, kernel_size=5, stride=1, padding=2),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 16, 7, 7)
+                nn.Sigmoid(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=2, stride=2),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=16, out_channels=16, kernel_size=5, stride=1, padding=2),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=2, stride=2),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=8, out_channels=1, kernel_size=7, stride=1, padding=3),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.is_convolutional = True
+
+    def get_enc_out_features(self, ae_idx):
+        _enc_out_features = [16 * 14 * 14, 16 * 7 * 7]
+        return _enc_out_features[ae_idx]
+
+
 # ===========
 # CLASSIFIERS
 # ===========
