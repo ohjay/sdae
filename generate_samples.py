@@ -35,6 +35,7 @@ def generate_samples_ae(dataset_key,
     batch_size = 1
     data_loader, sample_h, sample_w, _, _ = init_data_loader(
         dataset_key, True, batch_size, olshausen_path, olshausen_step_size, cub_folder)
+    img_shape = [sample_h, sample_w]
 
     # generate samples
     with torch.no_grad():
@@ -42,6 +43,7 @@ def generate_samples_ae(dataset_key,
         for original_idx in range(num_originals):
             img, _ = next(iter(data_loader))
             img = img.float().cuda()
+            img_shape = [d for d in img.size() if d != 1]
             if not model.is_convolutional:
                 img = img.view(img.size(0), -1)
             z = model.encode(img)  # top-layer representation
@@ -56,8 +58,12 @@ def generate_samples_ae(dataset_key,
                 sample_variations.append(sample)
             samples.append(torch.cat(sample_variations, dim=0))
         samples = torch.stack(samples, dim=0)  # shape: (num_originals, num_variations+1, sh*sw)
-        samples = samples.view(num_originals, num_variations + 1, sample_h, sample_w)
-        plot_samples(samples.cpu().numpy(), fig_save_path)
+        samples = samples.view(num_originals, num_variations + 1, *img_shape)
+        samples = samples.cpu().numpy()
+        if len(img_shape) == 3:
+            # reshape to (h, w, c)
+            samples = np.transpose(samples, (0, 1, 3, 4, 2))
+        plot_samples(samples, fig_save_path)
 
 
 def generate_samples_vae(num,

@@ -279,7 +279,7 @@ class CUB2011Dataset(data.Dataset):
                 if len(image.shape) == 2:
                     # convert to three-channel image
                     image = np.stack([image] * 3, axis=-1)
-                image = np.transpose(image, (2, 0, 1))  # reshape to be (c, h, w)
+                image = np.transpose(image, (2, 0, 1))  # reshape to (c, h, w)
                 assert image.shape == (3, self.RESIZE_H, self.RESIZE_W), image_name
                 if train_test_split[image_id]:
                     train_images.append(image)
