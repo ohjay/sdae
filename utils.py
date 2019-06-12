@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
-from datasets import OlshausenDataset, MNISTVariant, CUB2011Dataset
+from datasets import OlshausenDataset, MNISTVariant, CUB2011Dataset, CIFAR10Dataset
 
 
 def is_iterable(x):
@@ -170,6 +170,16 @@ def init_data_loader(dataset_key,
                                  normalize=False)
         sample_h = CUB2011Dataset.RESIZE_H
         sample_w = CUB2011Dataset.RESIZE_W
+    elif dataset_key == 'cifar10':
+        img_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Lambda(normalize),
+        ])
+        dataset = CIFAR10Dataset('./data',
+                                 train=train_ver,
+                                 transform=img_transform,
+                                 download=True)
+        sample_h, sample_w = 32, 32
     else:
         raise ValueError('unrecognized dataset: %s' % dataset_key)
     data_minval = dataset.get_minval()

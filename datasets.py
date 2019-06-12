@@ -8,8 +8,8 @@ import scipy.io as sio
 from torch.utils import data
 from scipy.ndimage import rotate
 from skimage.transform import resize
-from torchvision.datasets import MNIST
 from skimage.util import view_as_windows
+from torchvision.datasets import MNIST, CIFAR10
 
 
 def crop(img, bounding_box, data_format='hwc'):
@@ -308,3 +308,15 @@ class CUB2011Dataset(data.Dataset):
 
     def get_maxval(self):
         return self.images.max()
+
+
+class CIFAR10Dataset(CIFAR10):
+    """CIFAR-10."""
+
+    @staticmethod
+    def get_minval():
+        return 0.0  # assumes normalization
+
+    @staticmethod
+    def get_maxval():
+        return 1.0  # assumes normalization

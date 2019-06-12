@@ -313,13 +313,56 @@ class CUBCAE2(SAE):
                 nn.Upsample(scale_factor=2, mode='nearest'),
                 nn.ReflectionPad2d(2),
                 nn.Conv2d(in_channels=8, out_channels=3, kernel_size=5, stride=1, padding=0),
-                nn.Tanh(),  # shape: (batch, 3, 128, 128)
+                # shape: (batch, 3, 128, 128)
             ),
         ])
         self.is_convolutional = True
 
     def get_enc_out_features(self, ae_idx):
         _enc_out_features = [(32, 16, 16), (256, 2, 2)]
+        return _enc_out_features[ae_idx]
+
+
+class CIFARCAE(SAE):
+    """CIFAR-10 stacked convolutional autoencoder."""
+
+    def __init__(self):
+        super(CIFARCAE, self).__init__()
+
+        # shape: (batch, 3, 32, 32)
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, stride=1, padding=1),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 8, 16, 16)
+                nn.ReLU(),
+                nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 16, 8, 8)
+                nn.ReLU(),
+                nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 32, 4, 4)
+                nn.ReLU(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels=32, out_channels=16, kernel_size=3, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 16, 8, 8)
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels=16, out_channels=8, kernel_size=3, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 8, 16, 16)
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels=8, out_channels=3, kernel_size=3, stride=1, padding=0),
+                # shape: (batch, 3, 32, 32)
+            ),
+        ])
+        self.is_convolutional = True
+
+    def get_enc_out_features(self, ae_idx):
+        _enc_out_features = [(32, 4, 4)]
         return _enc_out_features[ae_idx]
 
 
