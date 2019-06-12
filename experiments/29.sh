@@ -5,7 +5,7 @@
 # Using the pretrained SDVAE from experiment 27,
 # trains and evaluates a SDVAE + classifier on the MNIST bg_rand classification task.
 
-python3 mnist_classification.py \
+python3 classification.py \
     --batch_size 128 \
     --learning_rate 0.001 \
     --num_epochs 75 \

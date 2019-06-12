@@ -16,7 +16,7 @@ python3 sdae.py \
     --save_path ./ckpt/cdae.pth \
     --weight_decay 0.0000001
 
-python3 mnist_classification.py \
+python3 classification.py \
     --batch_size 128 \
     --learning_rate 0.001 \
     --num_epochs 50 \

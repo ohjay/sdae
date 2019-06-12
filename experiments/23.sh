@@ -5,7 +5,7 @@
 # Using the pretrained DVAE from experiment 22,
 # trains and evaluates a DVAE + classifier on the MNIST classification task.
 
-python3 mnist_classification.py \
+python3 classification.py \
     --batch_size 128 \
     --learning_rate 0.005 \
     --num_epochs 50 \

@@ -15,7 +15,7 @@ python3 sdae.py \
     --weight_decay 0.0000001 \
     --save_path ./stage1_sae.pth
 
-python3 mnist_classification.py \
+python3 classification.py \
     --batch_size 128 \
     --learning_rate 0.005 \
     --num_epochs 20 \

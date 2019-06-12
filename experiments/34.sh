@@ -4,7 +4,7 @@
 # ------------
 # Trains experiment 32's CAE (+ a classifier) on the MNIST bg_rand classification task.
 
-python3 mnist_classification.py \
+python3 classification.py \
     --batch_size 128 \
     --learning_rate 0.001 \
     --num_epochs 50 \

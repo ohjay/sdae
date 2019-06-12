@@ -4,7 +4,7 @@
 # ------------
 # Trains experiment 37's CDAE (+ a classifier) to classify birds.
 
-python3 mnist_classification.py \
+python3 classification.py \
     --batch_size 128 \
     --learning_rate 0.0001 \
     --num_epochs 50 \

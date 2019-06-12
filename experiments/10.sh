@@ -7,7 +7,7 @@
 # - This has no SAE architecture at all
 # - This has no unsupervised pretraining
 
-python3 mnist_classification.py \
+python3 classification.py \
     --batch_size 128 \
     --learning_rate 0.005 \
     --num_epochs 50 \

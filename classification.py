@@ -16,7 +16,7 @@ def forward(img):
         return classifier(img)
 
 
-def mnist_train(data_loader, criterion):
+def do_train(data_loader, criterion):
     """Trains the model using one pass through the training set."""
     if sae is not None:
         sae.train()
@@ -42,7 +42,7 @@ def mnist_train(data_loader, criterion):
     print('[train] epoch {}/{}, loss={:.6f}'.format(epoch + 1, args.num_epochs, mean_loss.item()))
 
 
-def mnist_eval(data_loader, criterion):
+def do_eval(data_loader, criterion):
     """Evaluates the model on the entire validation/test set."""
     if sae is not None:
         sae.eval()
@@ -125,15 +125,15 @@ if __name__ == '__main__':
                                                     cub_folder=args.cub_folder)
 
     if args.no_train:
-        mnist_eval(data_loader_eval, criterion_eval)
+        do_eval(data_loader_eval, criterion_eval)
     else:
         # training loop
         for epoch in range(args.num_epochs):
-            mnist_train(data_loader_train, criterion_train)
+            do_train(data_loader_train, criterion_train)
             if epoch % args.log_freq == 0 or epoch == args.num_epochs - 1:
                 if sae is not None:
                     torch.save(sae.state_dict(), args.sae_save_path)
                     print('[o] saved SAE to %s' % args.sae_save_path)
                 torch.save(classifier.state_dict(), args.classifier_save_path)
                 print('[o] saved classifier to %s' % args.classifier_save_path)
-                mnist_eval(data_loader_eval, criterion_eval)
+                do_eval(data_loader_eval, criterion_eval)
