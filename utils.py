@@ -36,6 +36,16 @@ def normalize(x):
     return (x - x.min()) / (x.max() - x.min())
 
 
+def crop(img, bounding_box, data_format='hwc'):
+    x, y, width, height = bounding_box
+    if data_format.lower() in {'hw', 'hwc'}:
+        return img[y:y+height, x:x+width]
+    elif data_format.lower() in {'chw', 'nhw', 'nhwc'}:
+        return img[:, y:y+height, x:x+width]
+    elif data_format.lower() == 'nchw':
+        return img[:, :, y:y+height, x:x+width]
+
+
 def zero_mask(x, zero_frac):
     """Apply zero-masking noise to a PyTorch tensor.
     Returns noisy X and a bitmask describing the affected locations."""

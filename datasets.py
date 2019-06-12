@@ -5,8 +5,10 @@ import pickle
 import imageio
 import numpy as np
 import scipy.io as sio
+from utils import crop
 from torch.utils import data
 from scipy.ndimage import rotate
+from skimage.transform import resize
 from torchvision.datasets import MNIST
 from skimage.util import view_as_windows
 
@@ -164,7 +166,10 @@ class CUB2011Dataset(data.Dataset):
     training_file = 'train.h5'
     eval_file = 'eval.h5'
 
-    def __init__(self, cub_folder, train=True, normalize=False):
+    RESIZE_H = 128
+    RESIZE_W = 128
+
+    def __init__(self, cub_folder, train=True, normalize=False, generate=False):
         """CUB_FOLDER should contain the following items (among other things):
         images/, images.txt, train_test_split.txt, classes.txt, image_class_labels.txt."""
         super(CUB2011Dataset, self).__init__()
@@ -177,12 +182,18 @@ class CUB2011Dataset(data.Dataset):
         with open(self.classes_path, 'rb') as f:
             self.classes = pickle.load(f)
 
+        self.bounding_boxes_path = os.path.join(self.cub_folder, 'bounding_boxes.pkl')
+        if not os.path.exists(self.bounding_boxes_path):
+            self.process_bounding_boxes()
+        with open(self.bounding_boxes_path, 'rb') as f:
+            self.bounding_boxes = pickle.load(f)
+
         if self.train:
             data_path = os.path.join(self.cub_folder, self.training_file)
         else:
             data_path = os.path.join(self.cub_folder, self.eval_file)
 
-        if not os.path.exists(data_path):
+        if not os.path.exists(data_path) or generate:
             self.process_images_and_labels()
 
         h5f = h5py.File(data_path, 'r')
@@ -210,6 +221,15 @@ class CUB2011Dataset(data.Dataset):
         with open(self.classes_path, 'wb') as f:
             pickle.dump(classes, f, pickle.HIGHEST_PROTOCOL)
 
+    def process_bounding_boxes(self):
+        bounding_boxes = {}
+        with open(os.path.join(self.cub_folder, 'bounding_boxes.txt')) as f:
+            for line in f:
+                image_id, x, y, width, height = line.strip().split()
+                bounding_boxes[image_id - 1] = (x, y, width, height)
+        with open(self.bounding_boxes_path, 'wb') as f:
+            pickle.dump(bounding_boxes, f, pickle.HIGHEST_PROTOCOL)
+
     def process_images_and_labels(self):
         train_test_split = {}
         with open(os.path.join(self.cub_folder, 'train_test_split.txt')) as f:
@@ -229,11 +249,14 @@ class CUB2011Dataset(data.Dataset):
             for line in f:
                 image_id, image_name = line.strip().split()
                 image_path = os.path.join('images', image_name)
+                image = imageio.imread(image_path)
+                image = crop(image, self.bounding_boxes[image_id - 1])
+                image = resize(image, (self.RESIZE_H, self.RESIZE_W))
                 if train_test_split[image_id - 1]:
-                    train_images.append(imageio.imread(image_path))
+                    train_images.append(image)
                     train_labels.append(image_class_labels[image_id - 1])
                 else:
-                    eval_images.append(imageio.imread(image_path))
+                    eval_images.append(image)
                     eval_labels.append(image_class_labels[image_id - 1])
         train_images, train_labels = [np.array(ta) for ta in (train_images, train_labels)]
         eval_images, eval_labels = [np.array(ea) for ea in (eval_images, eval_labels)]
