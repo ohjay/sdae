@@ -1,5 +1,3 @@
-## SDAE
-
 ### Setup
 
 | Dataset      |                                                                   |
