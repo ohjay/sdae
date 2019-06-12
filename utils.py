@@ -12,9 +12,22 @@ from torchvision.utils import save_image
 from datasets import OlshausenDataset, MNISTVariant
 
 
+def is_iterable(x):
+    """Source: https://stackoverflow.com/a/1952481."""
+    try:
+        iter(x)
+        return True
+    except TypeError:
+        return False
+
+
+def product(iterable):
+    """Source: https://stackoverflow.com/a/595409."""
+    return reduce(operator.mul, iterable, 1)
+
+
 def to_img(x):
-    h = w = int(np.sqrt(
-        reduce(operator.mul, list(x.size())[1:], 1)))
+    h = w = int(np.sqrt(product(list(x.size())[1:])))
     x = x.view(x.size(0), 1, h, w)
     return x
 

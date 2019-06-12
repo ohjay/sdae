@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils import is_iterable, product
 
 
 class Flatten(nn.Module):
@@ -207,7 +208,7 @@ class MNISTCAE(SAE):
         self.is_convolutional = True
 
     def get_enc_out_features(self, ae_idx):
-        _enc_out_features = [8 * 2 * 2]
+        _enc_out_features = [(8, 2, 2)]
         return _enc_out_features[ae_idx]
 
 
@@ -250,7 +251,7 @@ class MNISTCAE2(SAE):
         self.is_convolutional = True
 
     def get_enc_out_features(self, ae_idx):
-        _enc_out_features = [16 * 14 * 14, 16 * 7 * 7]
+        _enc_out_features = [(16, 14, 14), (16, 7, 7)]
         return _enc_out_features[ae_idx]
 
 
@@ -272,10 +273,13 @@ class Classifier(nn.Module):
 
 
 class MNISTDenseClassifier2(Classifier):
-    """MNIST classifier (two dense blocks)."""
+    """MNIST classifier (two dense layers)."""
 
     def __init__(self, enc_out_features):
         super(MNISTDenseClassifier2, self).__init__()
+
+        if is_iterable(enc_out_features):
+            enc_out_features = product(enc_out_features)
 
         self.classifier = nn.Sequential(
             nn.Linear(enc_out_features, 1000),
@@ -283,6 +287,29 @@ class MNISTDenseClassifier2(Classifier):
             nn.Linear(1000, 10),
             nn.LogSoftmax(dim=1),
         )
+
+
+class MNISTConvClassifier4(Classifier):
+    """MNIST convolutional classifier (four conv layers)."""
+
+    def __init__(self, enc_out_features):
+        super(MNISTConvClassifier4, self).__init__()
+
+        # input dimensions
+        c, h, w = enc_out_features
+
+        self.classifier = nn.Sequential(
+            nn.Conv2d(in_channels=c, out_channels=c*2, kernel_size=9, stride=1, padding=3),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=c*2, out_channels=c*4, kernel_size=7, stride=1, padding=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=c*4, out_channels=c*4, kernel_size=5, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=c*4, out_channels=10, kernel_size=(h-6, w-6), stride=1, padding=0),
+            Flatten(),
+            nn.LogSoftmax(dim=1),
+        )
+        self.is_convolutional = True
 
 
 # ========================
