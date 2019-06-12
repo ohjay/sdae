@@ -16,4 +16,4 @@ python3 mnist_classification.py \
     --classifier_save_path ./stage2_classifier.pth \
     --weight_decay 0.0000001 \
     --loss_type nll \
-    --mnist_variant bg_rand
+    --dataset_key bg_rand

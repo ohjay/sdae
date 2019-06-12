@@ -5,12 +5,21 @@ import pickle
 import imageio
 import numpy as np
 import scipy.io as sio
-from utils import crop
 from torch.utils import data
 from scipy.ndimage import rotate
 from skimage.transform import resize
 from torchvision.datasets import MNIST
 from skimage.util import view_as_windows
+
+
+def crop(img, bounding_box, data_format='hwc'):
+    x, y, width, height = bounding_box
+    if data_format.lower() in {'hw', 'hwc'}:
+        return img[y:y+height, x:x+width]
+    elif data_format.lower() in {'chw', 'nhw', 'nhwc'}:
+        return img[:, y:y+height, x:x+width]
+    elif data_format.lower() == 'nchw':
+        return img[:, :, y:y+height, x:x+width]
 
 
 class OlshausenDataset(data.Dataset):
@@ -158,6 +167,14 @@ class MNISTVariant(MNIST):
     def processed_folder(self):
         return os.path.join(self.root, 'MNIST', 'processed')
 
+    @staticmethod
+    def get_minval():
+        return 0.0  # assumes normalization
+
+    @staticmethod
+    def get_maxval():
+        return 1.0  # assumes normalization
+
 
 class CUB2011Dataset(data.Dataset):
     """Caltech-UCSD Birds-200-2011.
@@ -197,7 +214,7 @@ class CUB2011Dataset(data.Dataset):
             self.process_images_and_labels()
 
         h5f = h5py.File(data_path, 'r')
-        self.images = h5f['images'][:]  # shape: (n, h, w, 3)
+        self.images = h5f['images'][:]  # shape: (n, 3, h, w)
         self.labels = h5f['labels'][:]  # shape: (n,)
         h5f.close()
 
@@ -217,7 +234,8 @@ class CUB2011Dataset(data.Dataset):
         with open(os.path.join(self.cub_folder, 'classes.txt')) as f:
             for line in f:
                 class_id, class_name = line.strip().split()
-                classes[class_id - 1] = class_name
+                class_id = int(class_id) - 1
+                classes[class_id] = class_name
         with open(self.classes_path, 'wb') as f:
             pickle.dump(classes, f, pickle.HIGHEST_PROTOCOL)
 
@@ -226,38 +244,49 @@ class CUB2011Dataset(data.Dataset):
         with open(os.path.join(self.cub_folder, 'bounding_boxes.txt')) as f:
             for line in f:
                 image_id, x, y, width, height = line.strip().split()
-                bounding_boxes[image_id - 1] = (x, y, width, height)
+                image_id = int(image_id) - 1
+                x, y, width, height = [int(float(t)) for t in (x, y, width, height)]
+                bounding_boxes[image_id] = (x, y, width, height)
         with open(self.bounding_boxes_path, 'wb') as f:
             pickle.dump(bounding_boxes, f, pickle.HIGHEST_PROTOCOL)
 
     def process_images_and_labels(self):
+        print('Generating...')
+
         train_test_split = {}
         with open(os.path.join(self.cub_folder, 'train_test_split.txt')) as f:
             for line in f:
                 image_id, is_training_image = line.strip().split()
-                train_test_split[image_id - 1] = bool(is_training_image)
+                image_id = int(image_id) - 1
+                train_test_split[image_id] = bool(int(is_training_image))
 
         image_class_labels = {}
         with open(os.path.join(self.cub_folder, 'image_class_labels.txt')) as f:
             for line in f:
-                image_id, class_id = line.strip().split()
-                image_class_labels[image_id - 1] = class_id - 1
+                image_id, class_id = [int(t) - 1 for t in line.strip().split()]
+                image_class_labels[image_id] = class_id
 
         train_images, train_labels = [], []
         eval_images, eval_labels = [], []
         with open(os.path.join(self.cub_folder, 'images.txt')) as f:
             for line in f:
                 image_id, image_name = line.strip().split()
-                image_path = os.path.join('images', image_name)
+                image_id = int(image_id) - 1
+                image_path = os.path.join(self.cub_folder, 'images', image_name)
                 image = imageio.imread(image_path)
-                image = crop(image, self.bounding_boxes[image_id - 1])
+                image = crop(image, self.bounding_boxes[image_id])
                 image = resize(image, (self.RESIZE_H, self.RESIZE_W))
-                if train_test_split[image_id - 1]:
+                if len(image.shape) == 2:
+                    # convert to three-channel image
+                    image = np.stack([image] * 3, axis=-1)
+                image = np.transpose(image, (2, 0, 1))  # reshape to be (c, h, w)
+                assert image.shape == (3, self.RESIZE_H, self.RESIZE_W), image_name
+                if train_test_split[image_id]:
                     train_images.append(image)
-                    train_labels.append(image_class_labels[image_id - 1])
+                    train_labels.append(image_class_labels[image_id])
                 else:
                     eval_images.append(image)
-                    eval_labels.append(image_class_labels[image_id - 1])
+                    eval_labels.append(image_class_labels[image_id])
         train_images, train_labels = [np.array(ta) for ta in (train_images, train_labels)]
         eval_images, eval_labels = [np.array(ea) for ea in (eval_images, eval_labels)]
 
@@ -270,6 +299,9 @@ class CUB2011Dataset(data.Dataset):
             h5f.create_dataset('images', data=images)
             h5f.create_dataset('labels', data=labels)
             h5f.close()
+
+        print('Done!')
+        print('Saved processed dataset to %s.' % self.cub_folder)
 
     def get_minval(self):
         return self.images.min()

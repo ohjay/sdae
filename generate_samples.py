@@ -26,6 +26,7 @@ def plot_samples(samples, fig_save_path=None):
 def generate_samples_ae(dataset_key,
                         olshausen_path=None,
                         olshausen_step_size=1,
+                        cub_folder=None,
                         num_originals=1,
                         num_variations=5,
                         fig_save_path=None):
@@ -33,7 +34,7 @@ def generate_samples_ae(dataset_key,
     # load data
     batch_size = 1
     data_loader, sample_h, sample_w, _, _ = init_data_loader(
-        dataset_key, True, batch_size, olshausen_path, olshausen_step_size)
+        dataset_key, True, batch_size, olshausen_path, olshausen_step_size, cub_folder)
 
     # generate samples
     with torch.no_grad():
@@ -95,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--restore_path', type=str, default=None)
     parser.add_argument('--olshausen_path', type=str, default=None)
     parser.add_argument('--olshausen_step_size', type=int, default=1)
+    parser.add_argument('--cub_folder', type=str, default=None)
     parser.add_argument('--num_originals', type=int, default=1)
     parser.add_argument('--num_variations', type=int, default=5)
     parser.add_argument('--fig_save_path', type=str, default=None)
@@ -119,6 +121,7 @@ if __name__ == '__main__':
         generate_samples_ae(args.dataset_key,
                             args.olshausen_path,
                             args.olshausen_step_size,
+                            args.cub_folder,
                             args.num_originals,
                             args.num_variations,
                             args.fig_save_path)

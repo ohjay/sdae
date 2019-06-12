@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
-from datasets import OlshausenDataset, MNISTVariant
+from datasets import OlshausenDataset, MNISTVariant, CUB2011Dataset
 
 
 def is_iterable(x):
@@ -27,23 +27,14 @@ def product(iterable):
 
 
 def to_img(x):
-    h = w = int(np.sqrt(product(list(x.size())[1:])))
-    x = x.view(x.size(0), 1, h, w)
+    if len(x.size()) < 4:
+        h = w = int(np.sqrt(product(list(x.size())[1:])))
+        x = x.view(x.size(0), 1, h, w)
     return x
 
 
 def normalize(x):
     return (x - x.min()) / (x.max() - x.min())
-
-
-def crop(img, bounding_box, data_format='hwc'):
-    x, y, width, height = bounding_box
-    if data_format.lower() in {'hw', 'hwc'}:
-        return img[y:y+height, x:x+width]
-    elif data_format.lower() in {'chw', 'nhw', 'nhwc'}:
-        return img[:, y:y+height, x:x+width]
-    elif data_format.lower() == 'nchw':
-        return img[:, :, y:y+height, x:x+width]
 
 
 def zero_mask(x, zero_frac):
@@ -147,7 +138,8 @@ def init_data_loader(dataset_key,
                      train_ver=True,
                      batch_size=128,
                      olshausen_path=None,
-                     olshausen_step_size=1):
+                     olshausen_step_size=1,
+                     cub_folder=None):
 
     dataset_key = dataset_key.lower()
     if dataset_key.startswith('mnist') \
@@ -164,7 +156,6 @@ def init_data_loader(dataset_key,
                                download=True,
                                variant=variant)
         sample_h, sample_w = 28, 28
-        data_minval, data_maxval = 0.0, 1.0
     elif dataset_key.startswith('olshausen'):
         # Olshausen natural scenes
         dataset = OlshausenDataset(olshausen_path,
@@ -172,9 +163,16 @@ def init_data_loader(dataset_key,
                                    step_size=olshausen_step_size,
                                    normalize=False)
         sample_h, sample_w = 12, 12
-        data_minval = dataset.get_minval()
-        data_maxval = dataset.get_maxval()
+    elif dataset_key.startswith('cub'):
+        # CUB birds
+        dataset = CUB2011Dataset(cub_folder,
+                                 train=train_ver,
+                                 normalize=False)
+        sample_h = CUB2011Dataset.RESIZE_H
+        sample_w = CUB2011Dataset.RESIZE_W
     else:
         raise ValueError('unrecognized dataset: %s' % dataset_key)
+    data_minval = dataset.get_minval()
+    data_maxval = dataset.get_maxval()
     data_loader = DataLoader(dataset, batch_size, shuffle=True)
     return data_loader, sample_h, sample_w, data_minval, data_maxval

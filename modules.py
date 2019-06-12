@@ -255,6 +255,60 @@ class MNISTCAE2(SAE):
         return _enc_out_features[ae_idx]
 
 
+class CUBCAE2(SAE):
+    """CUB stacked convolutional autoencoder (two blocks)."""
+
+    def __init__(self):
+        super(CUBCAE2, self).__init__()
+
+        # shape: (batch, 3, 128, 128)
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_channels=3, out_channels=8, kernel_size=11, stride=1, padding=5),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 8, 64, 64)
+                nn.ReLU(),
+                nn.Conv2d(in_channels=8, out_channels=16, kernel_size=11, stride=1, padding=5),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 16, 32, 32)
+                nn.ReLU(),
+            ),
+            nn.Sequential(
+                nn.Conv2d(in_channels=16, out_channels=32, kernel_size=7, stride=1, padding=3),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 32, 16, 16)
+                nn.ReLU(),
+                nn.Conv2d(in_channels=32, out_channels=32, kernel_size=7, stride=1, padding=3),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 32, 8, 8)
+                nn.ReLU(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 32, 16, 16)
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels=32, out_channels=16, kernel_size=3, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 16, 32, 32)
+            ),
+            nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels=16, out_channels=8, kernel_size=3, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 8, 64, 64)
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels=8, out_channels=3, kernel_size=3, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 3, 128, 128)
+            ),
+        ])
+        self.is_convolutional = True
+
+    def get_enc_out_features(self, ae_idx):
+        _enc_out_features = [(16, 32, 32), (32, 8, 8)]
+        return _enc_out_features[ae_idx]
+
+
 # ===========
 # CLASSIFIERS
 # ===========
@@ -310,6 +364,25 @@ class MNISTConvClassifier4(Classifier):
             nn.LogSoftmax(dim=1),
         )
         self.is_convolutional = True
+
+
+class CUBDenseClassifier3(Classifier):
+    """CUB classifier (three dense layers)."""
+
+    def __init__(self, enc_out_features):
+        super(CUBDenseClassifier3, self).__init__()
+
+        if is_iterable(enc_out_features):
+            enc_out_features = product(enc_out_features)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(enc_out_features, 2000),
+            nn.ReLU(),
+            nn.Linear(2000, 1000),
+            nn.ReLU(),
+            nn.Linear(1000, 200),
+            nn.LogSoftmax(dim=1),
+        )
 
 
 # ========================

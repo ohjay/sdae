@@ -14,4 +14,5 @@ python3 mnist_classification.py \
     --classifier_model_class MNISTDenseClassifier2 \
     --classifier_save_path ./stage2_classifier.pth \
     --weight_decay 0.0000001 \
-    --loss_type nll
+    --loss_type nll \
+    --dataset_key mnist

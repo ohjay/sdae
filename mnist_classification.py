@@ -26,7 +26,7 @@ def mnist_train(data_loader, criterion):
     for batch_idx, (img, label) in enumerate(data_loader):
         if sae is not None and not sae.is_convolutional:
             img = img.view(img.size(0), -1)
-        img, label = img.cuda(), label.cuda()
+        img, label = img.float().cuda(), label.cuda()
 
         # =============== forward ===============
         output = forward(img)
@@ -53,7 +53,7 @@ def mnist_eval(data_loader, criterion):
         for img, label in data_loader:
             if sae is not None and not sae.is_convolutional:
                 img = img.view(img.size(0), -1)
-            img, label = img.cuda(), label.cuda()
+            img, label = img.float().cuda(), label.cuda()
 
             # =============== forward ===============
             output = forward(img)
@@ -82,7 +82,8 @@ if __name__ == '__main__':
     parser.add_argument('--loss_type', type=str, default='nll')
     parser.add_argument('--no_train', action='store_true')
     parser.add_argument('--no_sae', action='store_true')
-    parser.add_argument('--mnist_variant', type=str, default='mnist')
+    parser.add_argument('--dataset_key', type=str, default='mnist')
+    parser.add_argument('--cub_folder', type=str, default=None)
 
     args = parser.parse_args()
     print(args)
@@ -114,8 +115,14 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(parameters, lr=args.learning_rate, weight_decay=args.weight_decay)
 
     # load data
-    data_loader_train, _, _, _, _ = init_data_loader(args.mnist_variant, True, args.batch_size)
-    data_loader_eval, _, _, _, _ = init_data_loader(args.mnist_variant, False, args.batch_size)
+    data_loader_train, _, _, _, _ = init_data_loader(args.dataset_key,
+                                                     train_ver=True,
+                                                     batch_size=args.batch_size,
+                                                     cub_folder=args.cub_folder)
+    data_loader_eval, _, _, _, _ = init_data_loader(args.dataset_key,
+                                                    train_ver=False,
+                                                    batch_size=args.batch_size,
+                                                    cub_folder=args.cub_folder)
 
     if args.no_train:
         mnist_eval(data_loader_eval, criterion_eval)

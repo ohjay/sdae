@@ -14,7 +14,7 @@ from utils import to_img, zero_mask, add_gaussian, salt_and_pepper, \
 def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                noise_type, zero_frac, gaussian_stdev, sp_frac, restore_path, save_path,
                log_freq, olshausen_path, olshausen_step_size, weight_decay, loss_type,
-               emph_wt_a, emph_wt_b, vae_reconstruction_loss_type):
+               emph_wt_a, emph_wt_b, vae_reconstruction_loss_type, cub_folder):
     # set up log folders
     if not os.path.exists('./01_original'):
         os.makedirs('./01_original')
@@ -34,7 +34,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
 
     # load data
     data_loader, _, _, data_minval, data_maxval = init_data_loader(
-        dataset_key, True, batch_size, olshausen_path, olshausen_step_size)
+        dataset_key, True, batch_size, olshausen_path, olshausen_step_size, cub_folder)
 
     # training loop
     affected = None
@@ -141,6 +141,7 @@ if __name__ == '__main__':
     parser.add_argument('--emph_wt_a', type=float, default=1)
     parser.add_argument('--emph_wt_b', type=float, default=1)
     parser.add_argument('--vae_reconstruction_loss_type', type=str, default='mse')
+    parser.add_argument('--cub_folder', type=str, default=None)
 
     args = parser.parse_args()
     print(args)
@@ -150,4 +151,4 @@ if __name__ == '__main__':
         args.batch_size, args.learning_rate, args.num_epochs, args.model_class, args.dataset_key,
         args.noise_type, args.zero_frac, args.gaussian_stdev, args.sp_frac, args.restore_path,
         args.save_path, args.log_freq, args.olshausen_path, args.olshausen_step_size, args.weight_decay,
-        args.loss_type, args.emph_wt_a, args.emph_wt_b, args.vae_reconstruction_loss_type)
+        args.loss_type, args.emph_wt_a, args.emph_wt_b, args.vae_reconstruction_loss_type, args.cub_folder)
