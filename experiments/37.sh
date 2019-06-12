@@ -6,8 +6,8 @@
 
 python3 sdae.py \
     --batch_size 128 \
-    --learning_rate 0.001 \
-    --num_epochs 50 \
+    --learning_rate 0.0002 \
+    --num_epochs 100 \
     --model_class CUBCAE2 \
     --dataset_key cub \
     --noise_type gs \

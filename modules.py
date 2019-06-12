@@ -264,48 +264,62 @@ class CUBCAE2(SAE):
         # shape: (batch, 3, 128, 128)
         self.encoders = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(in_channels=3, out_channels=8, kernel_size=11, stride=1, padding=5),
+                nn.Conv2d(in_channels=3, out_channels=8, kernel_size=5, stride=1, padding=2),
                 nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 8, 64, 64)
                 nn.ReLU(),
-                nn.Conv2d(in_channels=8, out_channels=16, kernel_size=11, stride=1, padding=5),
+                nn.Conv2d(in_channels=8, out_channels=16, kernel_size=5, stride=1, padding=2),
                 nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 16, 32, 32)
+                nn.ReLU(),
+                nn.Conv2d(in_channels=16, out_channels=32, kernel_size=5, stride=1, padding=2),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 32, 16, 16)
                 nn.ReLU(),
             ),
             nn.Sequential(
-                nn.Conv2d(in_channels=16, out_channels=32, kernel_size=7, stride=1, padding=3),
-                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 32, 16, 16)
+                nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, stride=1, padding=2),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 64, 8, 8)
                 nn.ReLU(),
-                nn.Conv2d(in_channels=32, out_channels=32, kernel_size=7, stride=1, padding=3),
-                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 32, 8, 8)
+                nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, stride=1, padding=2),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 128, 4, 4)
+                nn.ReLU(),
+                nn.Conv2d(in_channels=128, out_channels=256, kernel_size=5, stride=1, padding=2),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # shape: (batch, 256, 2, 2)
                 nn.ReLU(),
             ),
         ])
         self.decoders = nn.ModuleList([
             nn.Sequential(
                 nn.Upsample(scale_factor=2, mode='nearest'),
-                nn.ReflectionPad2d(1),
-                nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0),
-                nn.ReLU(),  # shape: (batch, 32, 16, 16)
+                nn.ReflectionPad2d(2),
+                nn.Conv2d(in_channels=256, out_channels=128, kernel_size=5, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 128, 4, 4)
                 nn.Upsample(scale_factor=2, mode='nearest'),
-                nn.ReflectionPad2d(1),
-                nn.Conv2d(in_channels=32, out_channels=16, kernel_size=3, stride=1, padding=0),
-                nn.ReLU(),  # shape: (batch, 16, 32, 32)
+                nn.ReflectionPad2d(2),
+                nn.Conv2d(in_channels=128, out_channels=64, kernel_size=5, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 64, 8, 8)
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(2),
+                nn.Conv2d(in_channels=64, out_channels=32, kernel_size=5, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 32, 16, 16)
             ),
             nn.Sequential(
                 nn.Upsample(scale_factor=2, mode='nearest'),
-                nn.ReflectionPad2d(1),
-                nn.Conv2d(in_channels=16, out_channels=8, kernel_size=3, stride=1, padding=0),
+                nn.ReflectionPad2d(2),
+                nn.Conv2d(in_channels=32, out_channels=16, kernel_size=5, stride=1, padding=0),
+                nn.ReLU(),  # shape: (batch, 16, 32, 32)
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReflectionPad2d(2),
+                nn.Conv2d(in_channels=16, out_channels=8, kernel_size=5, stride=1, padding=0),
                 nn.ReLU(),  # shape: (batch, 8, 64, 64)
                 nn.Upsample(scale_factor=2, mode='nearest'),
-                nn.ReflectionPad2d(1),
-                nn.Conv2d(in_channels=8, out_channels=3, kernel_size=3, stride=1, padding=0),
-                nn.ReLU(),  # shape: (batch, 3, 128, 128)
+                nn.ReflectionPad2d(2),
+                nn.Conv2d(in_channels=8, out_channels=3, kernel_size=5, stride=1, padding=0),
+                nn.Tanh(),  # shape: (batch, 3, 128, 128)
             ),
         ])
         self.is_convolutional = True
 
     def get_enc_out_features(self, ae_idx):
-        _enc_out_features = [(16, 32, 32), (32, 8, 8)]
+        _enc_out_features = [(32, 16, 16), (256, 2, 2)]
         return _enc_out_features[ae_idx]
 
 

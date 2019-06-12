@@ -6,8 +6,8 @@
 
 python3 classification.py \
     --batch_size 128 \
-    --learning_rate 0.0001 \
-    --num_epochs 50 \
+    --learning_rate 0.0002 \
+    --num_epochs 100 \
     --sae_model_class CUBCAE2 \
     --sae_restore_path ./ckpt/cubcdae.pth \
     --sae_save_path ./stage2_cubcdae.pth \
