@@ -5,16 +5,21 @@ Install [PyTorch](https://pytorch.org/get-started/locally/), NumPy, and
 ```
 pip install -r requirements.txt
 ```
-might work.
 
 There are two datasets you'll need to download manually (see below).
 I suggest you create a `data` folder and unpack the relevant files into it.
 Later, you will be able to specify the dataset paths as command line arguments.
 
-| | | |
-|-|-|-|
-| Olshausen    | [Link](http://www.rctn.org/bruno/sparsenet)                       |
-| CUB-200-2011 | [Link](http://www.vision.caltech.edu/visipedia/CUB-200-2011.html) |
+<table>
+  <tr>
+    <td>Olshausen</td>
+    <td><a href="http://www.rctn.org/bruno/sparsenet">Link</a></td>
+  </tr>
+  <tr>
+    <td>CUB-200-2011</td>
+    <td><a href="http://www.vision.caltech.edu/visipedia/CUB-200-2011.html">Link</a></td>
+  </tr>
+</table>
 
 ### Experiments
 
