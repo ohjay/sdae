@@ -36,6 +36,10 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
     else:
         criterion = init_loss(loss_type)
 
+    if len(learned_noise_wt) < model.num_blocks:
+        len_diff = model.num_blocks - len(learned_noise_wt)
+        learned_noise_wt.extend(learned_noise_wt[-1:] * len_diff)
+
     # load data
     data_loader, sample_c, sample_h, sample_w, data_minval, data_maxval = init_data_loader(
         dataset_key, True, batch_size, olshausen_path, olshausen_step_size, cub_folder)
@@ -48,9 +52,10 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
     for ae_idx in range(model.num_blocks):
 
         stdev = None
+        nt_loss = None
+        nt_optimizer = None
         noise_transformer = None
-        noise_transformer_params = []
-        if learned_noise_wt > 0:
+        if learned_noise_wt[ae_idx] > 0:
             noise_transformer = modules.NoiseTransformer(original_size).cuda()
             if nt_restore_prefix is not None:
                 nt_restore_path = '%s_%d.pth' % (nt_restore_prefix, ae_idx)
@@ -59,14 +64,15 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                     print('restored noise transformer from %s' % nt_restore_path)
                 else:
                     print('warning: checkpoint %s not found, skipping...' % nt_restore_path)
-            noise_transformer_params = list(noise_transformer.parameters())
+            nt_optimizer = torch.optim.Adam(
+                noise_transformer.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
         # train one block at a time
         print('--------------------')
         print('training block %d/%d' % (ae_idx + 1, model.num_blocks))
         print('--------------------')
-        params = model.get_block_parameters(ae_idx) + noise_transformer_params
-        optimizer = torch.optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
+        model_optimizer = torch.optim.Adam(
+            model.get_block_parameters(ae_idx), lr=learning_rate, weight_decay=weight_decay)
 
         for epoch in range(num_epochs):
             mean_loss, total_num_examples = 0, 0
@@ -82,7 +88,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                 original = original.detach()
 
                 # apply noise
-                if learned_noise_wt > 0:
+                if learned_noise_wt[ae_idx] > 0:
                     stdev = noise_transformer.compute_stdev(original)
                     noisy = noise_transformer.apply_noise(original, stdev)
                 else:
@@ -118,14 +124,19 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                         loss = criterion(output, original)
                     mean_loss += (loss - mean_loss) / (batch_idx + 1)  # assumes `loss` is mean for batch
 
-                if learned_noise_wt > 0:
+                if learned_noise_wt[ae_idx] > 0:
                     # encourage large standard deviations
-                    loss -= learned_noise_wt * torch.mean(stdev)
+                    nt_loss = loss - learned_noise_wt[ae_idx] * torch.mean(stdev)
 
                 # =============== backward ==============
-                optimizer.zero_grad()
+                if learned_noise_wt[ae_idx] > 0:
+                    nt_optimizer.zero_grad()
+                    nt_loss.backward(retain_graph=True)
+                    nt_optimizer.step()
+
+                model_optimizer.zero_grad()
                 loss.backward()
-                optimizer.step()
+                model_optimizer.step()
 
             # =================== log ===================
             print('epoch {}/{}, loss={:.6f}'.format(epoch + 1, num_epochs, mean_loss.item()))
@@ -142,7 +153,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                         save_image_wrapper(img, os.path.join(folder, '{}_{}.png'.format(desc, epoch + 1)))
 
                 # save learned stdev
-                if learned_noise_wt > 0:
+                if learned_noise_wt[ae_idx] > 0:
                     stdev_path = os.path.join(
                         './05_stdev', 'stdev_{}_{}.txt'.format(ae_idx, epoch + 1))
                     np.savetxt(stdev_path, stdev.data.cpu().numpy(), fmt='%.18f')
@@ -151,7 +162,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                 # save model(s)
                 torch.save(model.state_dict(), save_path)
                 print('[o] saved model to %s' % save_path)
-                if learned_noise_wt > 0 and nt_save_prefix is not None:
+                if learned_noise_wt[ae_idx] > 0 and nt_save_prefix is not None:
                     nt_save_path = '%s_%d.pth' % (nt_save_prefix, ae_idx)
                     torch.save(noise_transformer.state_dict(), nt_save_path)
                     print('[o] saved lvl-%d noise transformer to %s' % (ae_idx, nt_save_path))
@@ -183,7 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--emph_wt_b', type=float, default=1)
     parser.add_argument('--vae_reconstruction_loss_type', type=str, default='mse')
     parser.add_argument('--cub_folder', type=str, default=None)
-    parser.add_argument('--learned_noise_wt', type=float, default=0)
+    parser.add_argument('--learned_noise_wt', nargs='+', type=float, default=[0])
     parser.add_argument('--nt_restore_prefix', type=str, default=None)
     parser.add_argument('--nt_save_prefix', type=str, default=None)
 
