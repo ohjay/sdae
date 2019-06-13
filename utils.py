@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
-from datasets import OlshausenDataset, MNISTVariant, CUB2011Dataset, CIFAR10Dataset
+from datasets import OlshausenDataset, MNISTVariant, \
+    CUB2011Dataset, CIFAR10Dataset, InterpolationDataset
 
 
 def is_iterable(x):
@@ -83,6 +84,14 @@ def plot_first_layer_weights(model, weight_h=None, weight_w=None, block_on_viz=F
     else:
         nrows, ncols = 5, 10
     fig, ax = plt.subplots(nrows, ncols)
+
+    if nrows == 1 and ncols == 1:
+        ax = [[ax]]
+    elif nrows == 1:
+        ax = [[col for col in ax]]
+    elif ncols == 1:
+        ax = [[row] for row in ax]
+
     i = 0
     for row in ax:
         for col in row:
@@ -172,6 +181,7 @@ def init_data_loader(dataset_key,
         sample_h = CUB2011Dataset.RESIZE_H
         sample_w = CUB2011Dataset.RESIZE_W
     elif dataset_key == 'cifar10':
+        # CIFAR-10
         img_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Lambda(normalize),
@@ -181,6 +191,12 @@ def init_data_loader(dataset_key,
                                  transform=img_transform,
                                  download=True)
         sample_c, sample_h, sample_w = 3, 32, 32
+    elif dataset_key.startswith('interp'):
+        # Toy grayscale interpolation dataset
+        dataset = InterpolationDataset('./data',
+                                       normalize=True)
+        sample_c = 1
+        sample_h, sample_w = dataset.sample_h, dataset.sample_w
     else:
         raise ValueError('unrecognized dataset: %s' % dataset_key)
     data_minval = dataset.get_minval()

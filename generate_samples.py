@@ -11,8 +11,14 @@ def plot_samples(samples, fig_save_path=None):
     [of shape (num_originals, num_variations+1, sh, sw)]
     corresponding to Figure 15 from the 2010 SDAE paper,
     plots the samples in a grid of variations as per Figure 15."""
-    fig, ax = plt.subplots(
-        nrows=samples.shape[0], ncols=samples.shape[1])
+    nrows, ncols = samples.shape[:2]
+    fig, ax = plt.subplots(nrows, ncols)
+    if nrows == 1 and ncols == 1:
+        ax = [[ax]]
+    elif nrows == 1:
+        ax = [[col for col in ax]]
+    elif ncols == 1:
+        ax = [[row] for row in ax]
     for i, row in enumerate(ax):
         for j, col in enumerate(row):
             col.imshow(samples[i, j, :, :], cmap='gray')
@@ -69,15 +75,17 @@ def generate_samples_ae(dataset_key,
 def generate_samples_vae(num,
                          sample_h,
                          sample_w,
-                         fig_save_path=None):
+                         fig_save_path=None,
+                         lower=-3,
+                         upper=3):
 
     assert not model.is_convolutional
 
     # generate samples
     with torch.no_grad():
         # vary first two dims over grid
-        dim0_vals = np.linspace(-3, 3, num)
-        dim1_vals = np.linspace(-3, 3, num)
+        dim0_vals = np.linspace(lower, upper, num)
+        dim1_vals = np.linspace(lower, upper, num)
         dim0_vals, dim1_vals = np.meshgrid(dim0_vals, dim1_vals)
         latent_vecs = np.stack((dim0_vals, dim1_vals), axis=-1).reshape(-1, 2)
 
@@ -109,6 +117,8 @@ if __name__ == '__main__':
     parser.add_argument('--num', type=int, default=10)
     parser.add_argument('--sample_h', type=int, default=28)
     parser.add_argument('--sample_w', type=int, default=28)
+    parser.add_argument('--lower', type=float, default=-3)
+    parser.add_argument('--upper', type=float, default=3)
 
     args = parser.parse_args()
     print(args)
@@ -118,11 +128,14 @@ if __name__ == '__main__':
     model.num_trained_blocks = model.num_blocks
     model.eval()
 
-    if isinstance(model, modules.SVAE):
+    if isinstance(model, modules.SVAE) or \
+            args.dataset_key.lower().startswith('interp'):
         generate_samples_vae(args.num,
                              args.sample_h,
                              args.sample_w,
-                             args.fig_save_path)
+                             args.fig_save_path,
+                             args.lower,
+                             args.upper)
     else:
         generate_samples_ae(args.dataset_key,
                             args.olshausen_path,

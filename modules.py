@@ -208,6 +208,34 @@ class OlshausenSAE3(SAE):
         ])
 
 
+class DandelionSAE(SAE):
+    """Dandelion (grayscale interpolation) stacked autoencoder."""
+
+    def __init__(self):
+        super(DandelionSAE, self).__init__()
+
+        self.encoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=128*128, out_features=1000),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=1000, out_features=5),
+                nn.Sigmoid(),
+            ),
+        ])
+        self.decoders = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(in_features=5, out_features=1000),
+                nn.Sigmoid(),
+            ),
+            nn.Sequential(
+                nn.Linear(in_features=1000, out_features=128*128),
+                nn.Sigmoid(),
+            ),
+        ])
+
+
 class MNISTCAE(SAE):
     """MNIST convolutional autoencoder."""
 
