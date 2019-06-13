@@ -8,7 +8,7 @@ import torch
 import modules
 import argparse
 import numpy as np
-from utils import is_iterable, product, to_img, zero_mask, add_gaussian, salt_and_pepper, \
+from utils import try_float, to_img, zero_mask, add_gaussian, salt_and_pepper, \
     plot_first_layer_weights, save_image_wrapper, init_model, init_loss, init_data_loader
 
 
@@ -26,8 +26,8 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
         os.makedirs('./03_output')
     if not os.path.exists('./04_filters'):
         os.makedirs('./04_filters')
-    if not os.path.exists('./05_noise_levels'):
-        os.makedirs('./05_noise_levels')
+    if not os.path.exists('./05_stdev'):
+        os.makedirs('./05_stdev')
 
     # set up model and criterion
     model = init_model(model_class, restore_path, restore_required=False)
@@ -39,7 +39,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
     # load data
     data_loader, sample_c, sample_h, sample_w, data_minval, data_maxval = init_data_loader(
         dataset_key, True, batch_size, olshausen_path, olshausen_step_size, cub_folder)
-    original_shape = [sample_c, sample_h, sample_w]
+    original_size = sample_c * sample_h * sample_w
 
     # training loop
     affected = None
@@ -50,14 +50,8 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
         stdev = None
         noise_transformer = None
         noise_transformer_params = []
-        if learned_noise_wt > 0:
-            if is_iterable(original_shape) and model.is_convolutional:
-                # volumetric original
-                in_channels = original_shape[0]
-                noise_transformer = modules.ConvNoiseTransformer(in_channels).cuda()
-            else:
-                in_features = product(original_shape)
-                noise_transformer = modules.DenseNoiseTransformer(in_features).cuda()
+        if learned_noise_wt:
+            noise_transformer = modules.NoiseTransformer(original_size).cuda()
             if nt_restore_prefix is not None:
                 nt_restore_path = '%s_%d.pth' % (nt_restore_prefix, ae_idx)
                 if os.path.exists(nt_restore_path):
@@ -88,7 +82,7 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                 original = original.detach()
 
                 # apply noise
-                if learned_noise_wt > 0:
+                if learned_noise_wt:
                     stdev = noise_transformer.compute_stdev(original)
                     noisy = noise_transformer.apply_noise(original, stdev)
                 else:
@@ -124,9 +118,16 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                         loss = criterion(output, original)
                     mean_loss += (loss - mean_loss) / (batch_idx + 1)  # assumes `loss` is mean for batch
 
-                if learned_noise_wt > 0:
+                if learned_noise_wt:
                     # encourage large standard deviations
-                    loss -= learned_noise_wt * torch.mean(stdev)
+                    if type(learned_noise_wt) == str:
+                        if learned_noise_wt.lower().startswith(('sqrt', 'mean')):
+                            learned_noise_wt_ = np.sqrt(mean_loss.item())
+                        else:
+                            raise ValueError('invalid `learned_noise_wt` option %s' % learned_noise_wt)
+                    else:
+                        learned_noise_wt_ = learned_noise_wt
+                    loss -= learned_noise_wt_ * torch.mean(stdev)
 
                 # =============== backward ==============
                 optimizer.zero_grad()
@@ -147,29 +148,22 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                     for img, folder, desc in to_save:
                         save_image_wrapper(img, os.path.join(folder, '{}_{}.png'.format(desc, epoch + 1)))
 
-                # save noise levels
-                noise_levels_path = os.path.join(
-                    './05_noise_levels', 'noise_levels_{}.txt'.format(epoch + 1))
-                if learned_noise_wt > 0:
-                    np.savetxt(noise_levels_path, stdev.data.cpu().numpy())
-                else:
-                    with open(noise_levels_path, 'w') as f:
-                        f.write('noise_type: {0}\n'
-                                '--------------'.format(noise_type))
-                        f.write('zero_frac: {0}'.format(zero_frac))
-                        f.write('gaussian_stdev: {0}'.format(gaussian_stdev))
-                        f.write('sp_frac: {0}'.format(sp_frac))
-                print('[o] saved noise levels to %s' % noise_levels_path)
+                # save learned stdev
+                if learned_noise_wt:
+                    stdev_path = os.path.join(
+                        './05_stdev', 'stdev_{}_{}.txt'.format(ae_idx, epoch + 1))
+                    np.savetxt(stdev_path, stdev.data.cpu().numpy(), fmt='%.18f')
+                    print('[o] saved stdev to %s' % stdev_path)
 
                 # save model(s)
                 torch.save(model.state_dict(), save_path)
                 print('[o] saved model to %s' % save_path)
-                if learned_noise_wt > 0 and nt_save_prefix is not None:
+                if learned_noise_wt and nt_save_prefix is not None:
                     nt_save_path = '%s_%d.pth' % (nt_save_prefix, ae_idx)
                     torch.save(noise_transformer.state_dict(), nt_save_path)
                     print('[o] saved lvl-%d noise transformer to %s' % (ae_idx, nt_save_path))
         model.num_trained_blocks += 1
-        original_shape = model.get_enc_out_features(ae_idx)
+        original_size = model.get_enc_out_features(ae_idx)
 
     plot_first_layer_weights(model)
 
@@ -196,11 +190,12 @@ if __name__ == '__main__':
     parser.add_argument('--emph_wt_b', type=float, default=1)
     parser.add_argument('--vae_reconstruction_loss_type', type=str, default='mse')
     parser.add_argument('--cub_folder', type=str, default=None)
-    parser.add_argument('--learned_noise_wt', type=float, default=0)
+    parser.add_argument('--learned_noise_wt', default=0)
     parser.add_argument('--nt_restore_prefix', type=str, default=None)
     parser.add_argument('--nt_save_prefix', type=str, default=None)
 
     args = parser.parse_args()
+    args.learned_noise_wt = try_float(args.learned_noise_wt)
     print(args)
     print('----------')
 

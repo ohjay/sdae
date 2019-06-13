@@ -23,9 +23,14 @@ def is_iterable(x):
 
 def product(iterable):
     """Source: https://stackoverflow.com/a/595409."""
-    if not is_iterable(iterable):
-        return iterable  # safeguard against impostor iterables
     return reduce(operator.mul, iterable, 1)
+
+
+def try_float(x):
+    try:
+        return float(x)
+    except ValueError:
+        return x
 
 
 def to_img(x):

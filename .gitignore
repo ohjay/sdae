@@ -5,7 +5,7 @@ data/
 02_noisy/
 03_output/
 04_filters/
-05_noise_levels/
+05_stdev/
 *.pth
 ckpt/
 /*.png
