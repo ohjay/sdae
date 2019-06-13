@@ -220,13 +220,13 @@ class DandelionSAE(SAE):
                 nn.Sigmoid(),
             ),
             nn.Sequential(
-                nn.Linear(in_features=1000, out_features=5),
+                nn.Linear(in_features=1000, out_features=2),
                 nn.Sigmoid(),
             ),
         ])
         self.decoders = nn.ModuleList([
             nn.Sequential(
-                nn.Linear(in_features=5, out_features=1000),
+                nn.Linear(in_features=2, out_features=1000),
                 nn.Sigmoid(),
             ),
             nn.Sequential(

@@ -12,5 +12,5 @@ python3 generate_samples.py \
     --sample_h 128 \
     --sample_w 128 \
     --fig_save_path interp_gen_samples.png \
-    --lower 0 \
-    --upper 1
+    --lower -1 \
+    --upper 2
