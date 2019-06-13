@@ -26,13 +26,6 @@ def product(iterable):
     return reduce(operator.mul, iterable, 1)
 
 
-def try_float(x):
-    try:
-        return float(x)
-    except ValueError:
-        return x
-
-
 def to_img(x):
     if len(x.size()) < 4:
         h = w = int(np.sqrt(product(list(x.size())[1:])))
