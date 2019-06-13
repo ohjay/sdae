@@ -18,8 +18,9 @@ class Flatten(nn.Module):
 class NoiseTransformer(nn.Module):
     """Estimates and applies a noise transformation to an image."""
 
-    def __init__(self, in_features):
+    def __init__(self, in_features, min_stdev=0.4):
         super(NoiseTransformer, self).__init__()
+        self.min_stdev = min_stdev
         self.dense1 = nn.Linear(in_features, in_features // 2)
         self.dense2 = nn.Linear(in_features // 2, 1)  # global stdev
 
@@ -28,7 +29,9 @@ class NoiseTransformer(nn.Module):
         return self.apply_noise(x, stdev)
 
     def compute_stdev(self, x):
-        return torch.sigmoid(self.dense2(F.relu(self.dense1(x))))
+        stdev = F.relu(self.dense1(x))
+        stdev = torch.sigmoid(self.dense2(stdev))
+        return torch.clamp(stdev, min=self.min_stdev)
 
     @staticmethod
     def apply_noise(x, stdev):

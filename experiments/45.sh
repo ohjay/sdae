@@ -11,6 +11,6 @@ python3 sdae.py \
     --model_class MNISTSAE2 \
     --dataset_key mnist \
     --weight_decay 0.0000001 \
-    --save_path ./stage1_sae.pth \
-    --learned_noise_wt 0.02 \
+    --save_path ./ckpt/mnist_sae.pth \
+    --learned_noise_wt 0.025 \
     --nt_save_prefix ./ckpt/mnist_sae_nt
