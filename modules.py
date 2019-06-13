@@ -10,6 +10,53 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
+# ==================
+# NOISE TRANSFORMERS
+# ==================
+
+
+class NoiseTransformer(nn.Module):
+    """Estimates and applies a noise transformation to an image."""
+
+    def __init__(self):
+        super(NoiseTransformer, self).__init__()
+        self.stdev_estimator = nn.Sequential()
+
+    def forward(self, x):
+        stdev = self.compute_stdev(x)
+        return self.apply_noise(x, stdev)
+
+    def compute_stdev(self, x):
+        return self.stdev_estimator(x)  # same shape as input
+
+    @staticmethod
+    def apply_noise(x, stdev):
+        epsilon = torch.randn_like(stdev)
+        return x + stdev * epsilon
+
+
+class ConvNoiseTransformer(NoiseTransformer):
+    def __init__(self, in_channels):
+        super(ConvNoiseTransformer, self).__init__()
+        self.stdev_estimator = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels * 2, kernel_size=5, stride=1, padding=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels * 2, in_channels, kernel_size=5, stride=1, padding=2),
+            nn.Sigmoid(),
+        )
+
+
+class DenseNoiseTransformer(NoiseTransformer):
+    def __init__(self, in_features):
+        super(DenseNoiseTransformer, self).__init__()
+        self.stdev_estimator = nn.Sequential(
+            nn.Linear(in_features, in_features * 2),
+            nn.ReLU(),
+            nn.Linear(in_features * 2, in_features),
+            nn.Sigmoid(),
+        )
+
+
 # ====================
 # REGULAR AUTOENCODERS
 # ====================

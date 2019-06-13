@@ -23,6 +23,8 @@ def is_iterable(x):
 
 def product(iterable):
     """Source: https://stackoverflow.com/a/595409."""
+    if not is_iterable(iterable):
+        return iterable  # safeguard against impostor iterables
     return reduce(operator.mul, iterable, 1)
 
 
@@ -155,19 +157,20 @@ def init_data_loader(dataset_key,
                                transform=img_transform,
                                download=True,
                                variant=variant)
-        sample_h, sample_w = 28, 28
+        sample_c, sample_h, sample_w = 1, 28, 28
     elif dataset_key.startswith('olshausen'):
         # Olshausen natural scenes
         dataset = OlshausenDataset(olshausen_path,
                                    patch_size=12,
                                    step_size=olshausen_step_size,
                                    normalize=False)
-        sample_h, sample_w = 12, 12
+        sample_c, sample_h, sample_w = 1, 12, 12
     elif dataset_key.startswith('cub'):
         # CUB birds
         dataset = CUB2011Dataset(cub_folder,
                                  train=train_ver,
                                  normalize=False)
+        sample_c = 3
         sample_h = CUB2011Dataset.RESIZE_H
         sample_w = CUB2011Dataset.RESIZE_W
     elif dataset_key == 'cifar10':
@@ -179,10 +182,10 @@ def init_data_loader(dataset_key,
                                  train=train_ver,
                                  transform=img_transform,
                                  download=True)
-        sample_h, sample_w = 32, 32
+        sample_c, sample_h, sample_w = 3, 32, 32
     else:
         raise ValueError('unrecognized dataset: %s' % dataset_key)
     data_minval = dataset.get_minval()
     data_maxval = dataset.get_maxval()
     data_loader = DataLoader(dataset, batch_size, shuffle=True)
-    return data_loader, sample_h, sample_w, data_minval, data_maxval
+    return data_loader, sample_c, sample_h, sample_w, data_minval, data_maxval

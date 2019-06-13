@@ -115,14 +115,14 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(parameters, lr=args.learning_rate, weight_decay=args.weight_decay)
 
     # load data
-    data_loader_train, _, _, _, _ = init_data_loader(args.dataset_key,
-                                                     train_ver=True,
-                                                     batch_size=args.batch_size,
-                                                     cub_folder=args.cub_folder)
-    data_loader_eval, _, _, _, _ = init_data_loader(args.dataset_key,
-                                                    train_ver=False,
-                                                    batch_size=args.batch_size,
-                                                    cub_folder=args.cub_folder)
+    data_loader_train, _, _, _, _, _ = init_data_loader(args.dataset_key,
+                                                        train_ver=True,
+                                                        batch_size=args.batch_size,
+                                                        cub_folder=args.cub_folder)
+    data_loader_eval, _, _, _, _, _ = init_data_loader(args.dataset_key,
+                                                       train_ver=False,
+                                                       batch_size=args.batch_size,
+                                                       cub_folder=args.cub_folder)
 
     if args.no_train:
         do_eval(data_loader_eval, criterion_eval)

@@ -33,7 +33,7 @@ def generate_samples_ae(dataset_key,
 
     # load data
     batch_size = 1
-    data_loader, sample_h, sample_w, _, _ = init_data_loader(
+    data_loader, _, sample_h, sample_w, _, _ = init_data_loader(
         dataset_key, True, batch_size, olshausen_path, olshausen_step_size, cub_folder)
     img_shape = [sample_h, sample_w]
 
