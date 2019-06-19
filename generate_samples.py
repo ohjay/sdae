@@ -48,7 +48,9 @@ def generate_samples_ae(dataset_key,
         samples = []
         for original_idx in range(num_originals):
             img, _ = next(iter(data_loader))
-            img = img.float().cuda()
+            img = img.float()
+            if torch.cuda.is_available():
+                img = img.cuda()
             img_shape = [d for d in img.size() if d != 1]
             if not model.is_convolutional:
                 img = img.view(img.size(0), -1)
@@ -97,7 +99,9 @@ def generate_samples_vae(num,
             other_vals = np.tile(other_vals, (num * num, 1))  # shape: (n*n, ld-2)
             latent_vecs = np.concatenate((latent_vecs, other_vals), axis=1)  # shape: (n*n, ld)
 
-        latent_vecs = torch.from_numpy(latent_vecs).float().cuda()
+        latent_vecs = torch.from_numpy(latent_vecs).float()
+        if torch.cuda.is_available():
+            latent_vecs = latent_vecs.cuda()
         samples = model.decode(latent_vecs)  # shape: (n*n, sample_h*sample_w)
         samples = samples.view(num, num, sample_h, sample_w)
         plot_samples(samples.cpu().numpy(), fig_save_path)

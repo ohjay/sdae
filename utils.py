@@ -119,7 +119,9 @@ def save_image_wrapper(img, filepath):
 
 def init_model(model_class, restore_path, restore_required, **model_kwargs):
     # instantiate model
-    model = getattr(modules, model_class)(**model_kwargs).cuda()
+    model = getattr(modules, model_class)(**model_kwargs)
+    if torch.cuda.is_available():
+        model = model.cuda()
     print('instantiated a model of type %s' % model.__class__.__name__)
     # restore parameters
     if restore_required or restore_path:

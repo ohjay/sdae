@@ -26,7 +26,9 @@ def do_train(data_loader, criterion):
     for batch_idx, (img, label) in enumerate(data_loader):
         if sae is not None and not sae.is_convolutional:
             img = img.view(img.size(0), -1)
-        img, label = img.float().cuda(), label.cuda()
+        img = img.float()
+        if torch.cuda.is_available():
+            img, label = img.cuda(), label.cuda()
 
         # =============== forward ===============
         output = forward(img)
@@ -53,7 +55,9 @@ def do_eval(data_loader, criterion):
         for img, label in data_loader:
             if sae is not None and not sae.is_convolutional:
                 img = img.view(img.size(0), -1)
-            img, label = img.float().cuda(), label.cuda()
+            img = img.float()
+            if torch.cuda.is_available():
+                img, label = img.cuda(), label.cuda()
 
             # =============== forward ===============
             output = forward(img)

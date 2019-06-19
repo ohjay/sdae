@@ -26,7 +26,9 @@ def plot_tsne(model_class, restore_path, dataset_key, batch_size, cub_folder, fi
         img, label = next(iter(data_loader))
         if not model.is_convolutional:
             img = img.view(img.size(0), -1)
-        img, label = img.float().cuda(), label.data.cpu().numpy()
+        img, label = img.float(), label.data.cpu().numpy()
+        if torch.cuda.is_available():
+            img = img.cuda()
 
         z = model.encode(img)
         if isinstance(model, modules.SVAE):

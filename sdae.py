@@ -56,7 +56,9 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
         nt_optimizer = None
         noise_transformer = None
         if learned_noise_wt[ae_idx] > 0:
-            noise_transformer = modules.NoiseTransformer(original_size).cuda()
+            noise_transformer = modules.NoiseTransformer(original_size)
+            if torch.cuda.is_available():
+                noise_transformer = noise_transformer.cuda()
             if nt_restore_prefix is not None:
                 nt_restore_path = '%s_%d.pth' % (nt_restore_prefix, ae_idx)
                 if os.path.exists(nt_restore_path):
@@ -81,7 +83,8 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                 original = original.float()
                 if not model.is_convolutional:
                     original = original.view(original.size(0), -1)
-                original = original.cuda()
+                if torch.cuda.is_available():
+                    original = original.cuda()
                 original = model.encode(original)
                 if isinstance(model, modules.SVAE):
                     original = original[1]  # (sampled latent vector, mean, log_var)
@@ -104,7 +107,9 @@ def train_sdae(batch_size, learning_rate, num_epochs, model_class, dataset_key,
                             print('using clean image as input')
                             warning_displayed = True
                         noisy = original
-                    noisy = noisy.detach().cuda()
+                    noisy = noisy.detach()
+                    if torch.cuda.is_available():
+                        noisy = noisy.cuda()
 
                 # =============== forward ===============
                 if isinstance(model, modules.SVAE):
