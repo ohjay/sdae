@@ -28,6 +28,6 @@ You can run one of the provided experiment scripts using the command
 I have included a brief experiment description at the top of each script.
 You will need to change arguments such as `olshausen_path` and `cub_folder` which refer to dataset paths.
 
-### Sample Results
+### Associated Visuals
 
-coming soon!
+![ofmfts](https://user-images.githubusercontent.com/8358648/59959318-cd262800-9482-11e9-99e4-323066773608.png)
