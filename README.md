@@ -21,7 +21,7 @@ Later, you will be able to specify the dataset paths as command line arguments.
   </tr>
 </table>
 
-### Experiments
+### [Experiments](https://owenjow.xyz/sdae/report.pdf)
 
 You can run one of the provided experiment scripts using the command
 `./experiments/xx.sh`, where `xx` is the experiment number (e.g. `01`).
